@@ -1,6 +1,5 @@
 import {
   AmbientLight,
-  Box3,
   BoxGeometry,
   Color,
   DirectionalLight,
@@ -13,10 +12,6 @@ import {
   WebGLRenderer
 } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
-import {
-  buildMorphologyBlueprint,
-  generateSampleMorphGenomes
-} from '../../genomes/morphGenome.js';
 
 const META_DEFAULT_VERSION_INDEX = 0;
 const META_DEFAULT_WRITE_LOCK_INDEX = 1;
@@ -66,29 +61,8 @@ export function createViewer(canvas) {
   ground.receiveShadow = false;
   scene.add(ground);
 
-  const previewPad = new Mesh(
-    new BoxGeometry(7.2, 0.06, 7.2),
-    new MeshStandardMaterial({
-      color: '#0f172a',
-      roughness: 0.9,
-      metalness: 0.03
-    })
-  );
-  previewPad.position.set(-4.6, -0.65, -3.3);
-  scene.add(previewPad);
-
   const dynamicBodiesRoot = new Group();
   scene.add(dynamicBodiesRoot);
-
-  const previewRoot = new Group();
-  previewRoot.position.set(-4.6, -0.59, -3.3);
-  previewRoot.scale.setScalar(0.82);
-  scene.add(previewRoot);
-
-  const previewGroups = [];
-  const previewBounds = new Box3();
-  const previewCenter = new Vector3();
-  const previewSize = new Vector3();
 
   const sharedBodyMeshes = new Map();
   let sharedDescriptorMap = new Map();
@@ -339,10 +313,6 @@ export function createViewer(canvas) {
     let deltaSeconds = 0;
     if (lastFrameTimestamp !== null) {
       deltaSeconds = (timestamp - lastFrameTimestamp) / 1000;
-      previewRoot.rotation.y += deltaSeconds * 0.35;
-      previewGroups.forEach((group, index) => {
-        group.rotation.y += deltaSeconds * (0.15 + (index % 5) * 0.05);
-      });
     }
     updateCamera(deltaSeconds);
     lastFrameTimestamp = timestamp;
@@ -350,74 +320,6 @@ export function createViewer(canvas) {
   }
 
   renderer.setAnimationLoop(renderFrame);
-
-  function populateMorphPreview() {
-    previewRoot.clear();
-    previewGroups.length = 0;
-    const genomes = generateSampleMorphGenomes(12);
-    const columns = 4;
-    const spacing = 1.8;
-    const rows = Math.ceil(genomes.length / columns);
-    const offsetX = ((columns - 1) * spacing) / 2;
-    const offsetZ = ((rows - 1) * spacing) / 2;
-
-    genomes.forEach((genome, index) => {
-      const blueprint = buildMorphologyBlueprint(genome);
-      if (blueprint.errors.length > 0) {
-        console.warn('Preview blueprint validation failed:', blueprint.errors.join('; '));
-        return;
-      }
-      const materialMap = new Map(
-        Object.entries(blueprint.materials).map(([key, value]) => [key, value])
-      );
-      const group = new Group();
-      blueprint.bodies.forEach((body) => {
-        const halfExtents = body.halfExtents;
-        const geometry = new BoxGeometry(
-          halfExtents[0] * 2,
-          halfExtents[1] * 2,
-          halfExtents[2] * 2
-        );
-        const materialInfo = materialMap.get(body.materialId) || body.material || {};
-        const material = new MeshStandardMaterial({
-          color: materialInfo.color ?? '#38bdf8',
-          roughness: materialInfo.roughness ?? 0.38,
-          metalness: materialInfo.metalness ?? 0.18
-        });
-        const mesh = new Mesh(geometry, material);
-        mesh.position.set(
-          body.translation[0],
-          body.translation[1],
-          body.translation[2]
-        );
-        mesh.quaternion.set(
-          body.rotation[0],
-          body.rotation[1],
-          body.rotation[2],
-          body.rotation[3]
-        );
-        group.add(mesh);
-      });
-      previewBounds.setFromObject(group);
-      previewBounds.getCenter(previewCenter);
-      previewBounds.getSize(previewSize);
-      group.children.forEach((child) => {
-        child.position.sub(previewCenter);
-      });
-      const row = Math.floor(index / columns);
-      const col = index % columns;
-      group.position.set(
-        col * spacing - offsetX,
-        previewSize.y * 0.5,
-        row * spacing - offsetZ
-      );
-      previewRoot.add(group);
-      previewGroups.push(group);
-    });
-  }
-
-  populateMorphPreview();
-
   return {
     applySharedLayout,
     setSharedStateBuffer,
