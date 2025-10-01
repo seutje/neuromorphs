@@ -1,10 +1,17 @@
+import {
+  OBJECTIVE_POSITION,
+  horizontalDistanceToObjective
+} from '../environment/arena.js';
+
 const DEFAULT_OPTIONS = {
   fallHeight: 0.25,
   fallPenalty: 2,
   heightWeight: 0.1,
   velocityWeight: 0.5,
   uprightPercentile: 0.6,
-  fallHeightRatio: 0.6
+  fallHeightRatio: 0.6,
+  objectiveWeight: 1,
+  objectivePosition: OBJECTIVE_POSITION
 };
 
 function toVector(sample) {
@@ -57,7 +64,10 @@ export function analyzeLocomotionTrace(samples, options = {}) {
       runtime: 0,
       averageSpeed: 0,
       averageHeight: 0,
-      fallFraction: 0
+      fallFraction: 0,
+      objectiveStartDistance: 0,
+      objectiveEndDistance: 0,
+      objectiveBestDistance: 0
     };
   }
   const config = { ...DEFAULT_OPTIONS, ...options };
@@ -69,6 +79,9 @@ export function analyzeLocomotionTrace(samples, options = {}) {
   let integralHeight = 0;
   const heightSegments = [];
   const heights = [];
+  let objectiveStartDistance = null;
+  let objectiveEndDistance = null;
+  let objectiveBestDistance = Infinity;
 
   samples.forEach((sample, index) => {
     const com = toVector(sample.centerOfMass ?? sample.position);
@@ -81,6 +94,14 @@ export function analyzeLocomotionTrace(samples, options = {}) {
     integralHeight += height * dt;
     heightSegments.push({ dt, height });
     heights.push(height);
+    const objectiveDistance = horizontalDistanceToObjective(com, config.objectivePosition);
+    if (objectiveStartDistance === null) {
+      objectiveStartDistance = objectiveDistance;
+    }
+    objectiveEndDistance = objectiveDistance;
+    if (objectiveDistance < objectiveBestDistance) {
+      objectiveBestDistance = objectiveDistance;
+    }
     lastVector = com;
     previousTimestamp = timestamp;
   });
@@ -102,7 +123,15 @@ export function analyzeLocomotionTrace(samples, options = {}) {
     runtime,
     averageSpeed,
     averageHeight,
-    fallFraction
+    fallFraction,
+    objectiveStartDistance: objectiveStartDistance ??
+      horizontalDistanceToObjective(start, config.objectivePosition),
+    objectiveEndDistance: objectiveEndDistance ??
+      horizontalDistanceToObjective(start, config.objectivePosition),
+    objectiveBestDistance:
+      Number.isFinite(objectiveBestDistance) && objectiveBestDistance !== Infinity
+        ? objectiveBestDistance
+        : horizontalDistanceToObjective(start, config.objectivePosition)
   };
 }
 
@@ -112,9 +141,18 @@ export function computeLocomotionFitness(samples, options = {}) {
   const heightBonus = stats.averageHeight * config.heightWeight;
   const speedBonus = stats.averageSpeed * config.velocityWeight;
   const fallPenalty = config.fallPenalty * stats.fallFraction;
+  const objectiveImprovement = Math.max(
+    stats.objectiveStartDistance - stats.objectiveBestDistance,
+    0
+  );
+  const objectiveReward = objectiveImprovement * config.objectiveWeight;
   return {
     ...stats,
-    fitness: Math.max(stats.displacement + heightBonus + speedBonus - fallPenalty, 0)
+    objectiveReward,
+    fitness: Math.max(
+      stats.displacement + heightBonus + speedBonus + objectiveReward - fallPenalty,
+      0
+    )
   };
 }
 

@@ -56,6 +56,24 @@ describe('computeLocomotionFitness', () => {
     expect(fastFitness.fitness).toBeGreaterThan(slowFitness.fitness);
   });
 
+  it('adds an objective reward when moving closer to the target cube', () => {
+    const towardObjective = [
+      { timestamp: 0, centerOfMass: { x: 0, y: 0.8, z: 0 }, rootHeight: 0.8 },
+      { timestamp: 1, centerOfMass: { x: 6.5, y: 0.82, z: 0 }, rootHeight: 0.82 }
+    ];
+    const awayFromObjective = [
+      { timestamp: 0, centerOfMass: { x: 0, y: 0.8, z: 0 }, rootHeight: 0.8 },
+      { timestamp: 1, centerOfMass: { x: -6.5, y: 0.82, z: 0 }, rootHeight: 0.82 }
+    ];
+
+    const towardFitness = computeLocomotionFitness(towardObjective);
+    const awayFitness = computeLocomotionFitness(awayFromObjective);
+
+    expect(towardFitness.displacement).toBeCloseTo(awayFitness.displacement, 5);
+    expect(towardFitness.objectiveReward).toBeGreaterThan(awayFitness.objectiveReward);
+    expect(towardFitness.fitness).toBeGreaterThan(awayFitness.fitness);
+  });
+
   it('detects prolonged loss of upright height even without ground contact', () => {
     const trace = [
       { timestamp: 0, centerOfMass: { x: 0, y: 0.8, z: 0 }, rootHeight: 0.8 },

@@ -12,6 +12,13 @@ import {
   WebGLRenderer
 } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+import {
+  ARENA_FLOOR_Y,
+  ARENA_SIZE,
+  OBJECTIVE_COLOR,
+  OBJECTIVE_POSITION,
+  OBJECTIVE_SIZE
+} from '../environment/arena.js';
 
 const META_DEFAULT_VERSION_INDEX = 0;
 const META_DEFAULT_WRITE_LOCK_INDEX = 1;
@@ -50,16 +57,32 @@ export function createViewer(canvas) {
   fillLight.position.set(-5, 2.5, -6);
   scene.add(ambient, keyLight, fillLight);
 
-  const groundGeometry = new BoxGeometry(16, 0.2, 12);
+  const groundGeometry = new BoxGeometry(ARENA_SIZE.width, ARENA_SIZE.height, ARENA_SIZE.depth);
   const groundMaterial = new MeshStandardMaterial({
     color: '#111827',
     roughness: 0.88,
     metalness: 0.04
   });
   const ground = new Mesh(groundGeometry, groundMaterial);
-  ground.position.y = -0.62;
+  ground.position.y = ARENA_FLOOR_Y - 0.02;
   ground.receiveShadow = false;
   scene.add(ground);
+
+  const objectiveGeometry = new BoxGeometry(
+    OBJECTIVE_SIZE.width,
+    OBJECTIVE_SIZE.height,
+    OBJECTIVE_SIZE.depth
+  );
+  const objectiveMaterial = new MeshStandardMaterial({
+    color: OBJECTIVE_COLOR,
+    roughness: 0.32,
+    metalness: 0.12
+  });
+  const objectiveMesh = new Mesh(objectiveGeometry, objectiveMaterial);
+  objectiveMesh.position.set(OBJECTIVE_POSITION.x, OBJECTIVE_POSITION.y, OBJECTIVE_POSITION.z);
+  objectiveMesh.castShadow = false;
+  objectiveMesh.receiveShadow = false;
+  scene.add(objectiveMesh);
 
   const dynamicBodiesRoot = new Group();
   scene.add(dynamicBodiesRoot);
