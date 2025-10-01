@@ -485,11 +485,13 @@ physicsWorker.addEventListener('message', (event) => {
         const height = Number(summary.rootHeight ?? 0).toFixed(3);
         const contact = summary.footContact ? 'yes' : 'no';
         const angle = Number(summary.primaryJointAngle ?? 0).toFixed(3);
+        const objectiveDistance = Number(summary.objectiveDistance ?? 0).toFixed(3);
         console.info(
-          '[Sensors] height=%sm, contact=%s, jointAngle=%srad',
+          '[Sensors] height=%sm, contact=%s, jointAngle=%srad, objectiveDistance=%sm',
           height,
           contact,
-          angle
+          angle,
+          objectiveDistance
         );
         sensorLogTimestamp = data.timestamp;
       }

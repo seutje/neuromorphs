@@ -13,6 +13,13 @@ import {
   decodeReplayBuffer,
   createReplayPlayback
 } from './replayRecorder.js';
+import {
+  ARENA_FLOOR_Y,
+  ARENA_HALF_EXTENTS,
+  OBJECTIVE_HALF_EXTENTS,
+  OBJECTIVE_POSITION,
+  horizontalDistanceToObjective
+} from '../public/environment/arena.js';
 
 function createInteractionGroup(membership, filter) {
   const membershipMask = membership & 0xffff;
@@ -554,6 +561,12 @@ function gatherSensorSnapshot() {
 
   const rootId = bodyOrder[0];
   const root = rootId ? bodyMap.get(rootId) : null;
+  const rootEntry = rootId ? creatureBodies.get(rootId) : null;
+  const rootTranslation = rootEntry?.body.translation();
+  const rootPosition = rootTranslation
+    ? { x: rootTranslation.x, y: rootTranslation.y, z: rootTranslation.z }
+    : { x: 0, y: 0, z: 0 };
+  const objectiveDistance = horizontalDistanceToObjective(rootPosition, OBJECTIVE_POSITION);
   const footCandidate = bodies.find((body) => body.id !== rootId) || null;
   const summary = {
     rootHeight: root?.height ?? 0,
@@ -561,7 +574,9 @@ function gatherSensorSnapshot() {
     rootSpeed: root?.speed ?? 0,
     footContact: footCandidate?.contact ?? false,
     primaryJointAngle: joints[0]?.angle ?? 0,
-    primaryJointVelocity: joints[0]?.velocity ?? 0
+    primaryJointVelocity: joints[0]?.velocity ?? 0,
+    rootPosition,
+    objectiveDistance
   };
 
   return {
@@ -646,10 +661,23 @@ async function initializeWorld() {
     world = new RAPIER.World(gravity);
     world.timestep = 1 / 60;
 
-    const floorCollider = RAPIER.ColliderDesc.cuboid(7, 0.1, 6)
-      .setTranslation(0, -0.6, 0)
+    const floorCollider = RAPIER.ColliderDesc.cuboid(
+      ARENA_HALF_EXTENTS.x,
+      ARENA_HALF_EXTENTS.y,
+      ARENA_HALF_EXTENTS.z
+    )
+      .setTranslation(0, ARENA_FLOOR_Y, 0)
       .setCollisionGroups(COLLISION_GROUP_ENVIRONMENT);
     world.createCollider(floorCollider);
+
+    const objectiveCollider = RAPIER.ColliderDesc.cuboid(
+      OBJECTIVE_HALF_EXTENTS.x,
+      OBJECTIVE_HALF_EXTENTS.y,
+      OBJECTIVE_HALF_EXTENTS.z
+    )
+      .setTranslation(OBJECTIVE_POSITION.x, OBJECTIVE_POSITION.y, OBJECTIVE_POSITION.z)
+      .setCollisionGroups(COLLISION_GROUP_ENVIRONMENT);
+    world.createCollider(objectiveCollider);
 
     const defaultMorph = createDefaultMorphGenome();
     const defaultController = createDefaultControllerGenome();
