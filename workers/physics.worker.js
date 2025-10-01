@@ -477,12 +477,14 @@ function applyControllerCommands(result) {
       [parentRotation.x, parentRotation.y, parentRotation.z, parentRotation.w],
       axis
     );
-    const torqueStrength = 18;
-    const torqueMagnitude = clamp(command.value ?? 0, -1, 1) * torqueStrength;
+    const dt = typeof world?.timestep === 'number' ? world.timestep : 1 / 60;
+    const torqueScale = 540;
+    const torqueImpulseMagnitude =
+      clamp(command.value ?? 0, -1, 1) * torqueScale * dt;
     const torque = {
-      x: worldAxis[0] * torqueMagnitude,
-      y: worldAxis[1] * torqueMagnitude,
-      z: worldAxis[2] * torqueMagnitude
+      x: worldAxis[0] * torqueImpulseMagnitude,
+      y: worldAxis[1] * torqueImpulseMagnitude,
+      z: worldAxis[2] * torqueImpulseMagnitude
     };
     childEntry.body.applyTorqueImpulse(torque, true);
     parentEntry.body.applyTorqueImpulse(
