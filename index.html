@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Neuromorphs Playground</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <h1>Neuromorphs Playground</h1>
+      <p class="tagline">Procedural creatures evolved in your browser.</p>
+    </header>
+    <main class="content">
+      <section class="viewport-panel">
+        <canvas id="viewport" aria-label="Creature preview" role="img"></canvas>
+        <p class="status" id="status-message">Loading WebGL and physics modules…</p>
+      </section>
+      <section class="info-panel">
+        <h2>Welcome</h2>
+        <p>
+          The project skeleton is ready. Three.js renders a placeholder cube and Rapier’s WebAssembly
+          bundle initializes in the background. Future phases will swap this message with real evolution
+          controls and analytics.
+        </p>
+        <button id="action-button" type="button">Pause Spin</button>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <small>
+        Serve this directory with <code>python3 -m http.server 8080</code> and open
+        <code>http://localhost:8080/index.html</code> to explore the prototype.
+      </small>
+    </footer>
+    <script type="module" src="./public/app.js"></script>
+  </body>
+</html>

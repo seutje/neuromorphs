@@ -6,19 +6,19 @@
 ---
 
 ## Phase 0 — Project Skeleton (No Build)
-- [ ] **P0-01: Basic HTML/JS/CSS Project Skeleton**
+- [x] **P0-01: Basic HTML/JS/CSS Project Skeleton**
   - **Owner:** DevOps Agent
   - **Inputs:** None
   - **Outputs:** `index.html` in project root, `style.css`, `app.js` in `/public`
   - **DoD:** Opening `index.html` in browser runs placeholder app
   - **Dependencies:** —
-- [ ] **P0-02: Dependency Loading via CDN**
+- [x] **P0-02: Dependency Loading via CDN**
   - **Owner:** Platform Agent
   - **Inputs:** CDN URLs for Three.js, Rapier WASM, UI libs
   - **Outputs:** `<script type="module">` imports in `index.html`
   - **DoD:** Three.js and Rapier load in browser network tab
   - **Dependencies:** P0-01
-- [ ] **P0-03: Project Configuration (No Transpilation)**
+- [x] **P0-03: Project Configuration (No Transpilation)**
   - **Owner:** Platform Agent
   - **Inputs:** ES Modules only
   - **Outputs:** Flat file tree structure; `README.md` with run instructions
