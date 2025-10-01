@@ -2,7 +2,9 @@ const DEFAULT_OPTIONS = {
   fallHeight: 0.25,
   fallPenalty: 2,
   heightWeight: 0.1,
-  velocityWeight: 0.5
+  velocityWeight: 0.5,
+  uprightPercentile: 0.6,
+  fallHeightRatio: 0.6
 };
 
 function toVector(sample) {
@@ -23,6 +25,31 @@ function safeNumber(value, fallback = 0) {
   return Number.isFinite(Number(value)) ? Number(value) : fallback;
 }
 
+function estimateHeightPercentile(values, percentile) {
+  if (!Array.isArray(values) || values.length === 0) {
+    return 0;
+  }
+  const finiteValues = values.filter((value) => Number.isFinite(value));
+  if (finiteValues.length === 0) {
+    return 0;
+  }
+  const sorted = [...finiteValues].sort((a, b) => a - b);
+  const clamped = Math.min(Math.max(percentile ?? 0.5, 0), 1);
+  if (sorted.length === 1) {
+    return sorted[0];
+  }
+  const position = clamped * (sorted.length - 1);
+  const lowerIndex = Math.floor(position);
+  const upperIndex = Math.min(sorted.length - 1, Math.ceil(position));
+  const lower = sorted[lowerIndex];
+  const upper = sorted[upperIndex];
+  if (lowerIndex === upperIndex) {
+    return lower;
+  }
+  const weight = position - lowerIndex;
+  return lower + (upper - lower) * weight;
+}
+
 export function analyzeLocomotionTrace(samples, options = {}) {
   if (!Array.isArray(samples) || samples.length === 0) {
     return {
@@ -40,7 +67,8 @@ export function analyzeLocomotionTrace(samples, options = {}) {
   let runtime = 0;
   let integralSpeed = 0;
   let integralHeight = 0;
-  let fallTime = 0;
+  const heightSegments = [];
+  const heights = [];
 
   samples.forEach((sample, index) => {
     const com = toVector(sample.centerOfMass ?? sample.position);
@@ -51,9 +79,8 @@ export function analyzeLocomotionTrace(samples, options = {}) {
     integralSpeed += dt > 0 ? segmentDistance / dt : 0;
     const height = safeNumber(sample.rootHeight ?? com.y, 0);
     integralHeight += height * dt;
-    if (height < config.fallHeight) {
-      fallTime += dt;
-    }
+    heightSegments.push({ dt, height });
+    heights.push(height);
     lastVector = com;
     previousTimestamp = timestamp;
   });
@@ -62,7 +89,13 @@ export function analyzeLocomotionTrace(samples, options = {}) {
   const displacement = horizontalDistance(start, end);
   const averageSpeed = runtime > 0 ? integralSpeed / samples.length : 0;
   const averageHeight = runtime > 0 ? integralHeight / runtime : 0;
-  const fallFraction = runtime > 0 ? fallTime / runtime : 0;
+  const baselineHeight = estimateHeightPercentile(heights, config.uprightPercentile);
+  const fallThreshold = Math.max(config.fallHeight, baselineHeight * config.fallHeightRatio);
+  const fallTime = heightSegments.reduce(
+    (total, segment) => (segment.height < fallThreshold ? total + segment.dt : total),
+    0
+  );
+  const fallFraction = runtime > 0 ? Math.min(fallTime / runtime, 1) : 0;
 
   return {
     displacement,

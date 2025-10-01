@@ -55,6 +55,24 @@ describe('computeLocomotionFitness', () => {
     expect(fastFitness.displacement).toBeGreaterThan(slowFitness.displacement);
     expect(fastFitness.fitness).toBeGreaterThan(slowFitness.fitness);
   });
+
+  it('detects prolonged loss of upright height even without ground contact', () => {
+    const trace = [
+      { timestamp: 0, centerOfMass: { x: 0, y: 0.8, z: 0 }, rootHeight: 0.8 },
+      { timestamp: 0.5, centerOfMass: { x: 0.1, y: 0.78, z: 0 }, rootHeight: 0.78 },
+      { timestamp: 1.0, centerOfMass: { x: 0.2, y: 0.76, z: 0 }, rootHeight: 0.76 },
+      { timestamp: 1.5, centerOfMass: { x: 0.3, y: 0.5, z: 0 }, rootHeight: 0.5 },
+      { timestamp: 2.0, centerOfMass: { x: 0.4, y: 0.4, z: 0 }, rootHeight: 0.4 },
+      { timestamp: 2.5, centerOfMass: { x: 0.5, y: 0.35, z: 0 }, rootHeight: 0.35 }
+    ];
+
+    const metrics = computeLocomotionFitness(trace);
+
+    expect(metrics.runtime).toBeCloseTo(2.5, 5);
+    expect(metrics.fallFraction).toBeGreaterThan(0);
+    expect(metrics.fallFraction).toBeCloseTo(0.4, 2);
+    expect(1 - metrics.fallFraction).toBeLessThan(0.7);
+  });
 });
 
 describe('runEvolution', () => {
