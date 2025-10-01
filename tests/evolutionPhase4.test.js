@@ -4,6 +4,37 @@ import { mutateMorphGenome, mutateControllerGenome } from '../public/evolution/m
 import { createRng } from '../public/evolution/rng.js';
 import { computeLocomotionFitness } from '../public/evolution/fitness.js';
 import { runEvolution } from '../public/evolution/evolutionEngine.js';
+import { createSyntheticTrace } from '../public/evolution/demo.js';
+
+describe('createSyntheticTrace', () => {
+  it('caps extreme oscillator parameters to plausible displacement', () => {
+    const individual = {
+      morph: { bodies: Array.from({ length: 10 }, () => ({})) },
+      controller: {
+        nodes: [
+          { type: 'oscillator', amplitude: 50, frequency: 40 },
+          { type: 'bias' }
+        ]
+      }
+    };
+    const rng = createRng(7);
+    const steps = 60;
+
+    const trace = createSyntheticTrace(individual, rng, steps);
+
+    expect(trace).toHaveLength(steps + 1);
+    const finalSample = trace[trace.length - 1];
+    expect(finalSample.timestamp).toBeCloseTo(1, 5);
+    expect(finalSample.centerOfMass.x).toBeLessThanOrEqual(2.65);
+
+    const segmentSpeeds = trace.slice(1).map((sample, index) => {
+      const prev = trace[index];
+      const deltaTime = sample.timestamp - prev.timestamp;
+      return deltaTime > 0 ? (sample.centerOfMass.x - prev.centerOfMass.x) / deltaTime : 0;
+    });
+    expect(Math.max(...segmentSpeeds)).toBeLessThanOrEqual(2.63);
+  });
+});
 
 describe('morph genome mutations', () => {
   it('produces schema-valid variants with recorded operations', () => {
