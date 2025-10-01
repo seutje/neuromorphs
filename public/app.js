@@ -1,7 +1,6 @@
 import {
   AmbientLight,
   BoxGeometry,
-  Clock,
   Color,
   DirectionalLight,
   Mesh,
@@ -11,7 +10,6 @@ import {
   Vector3,
   WebGLRenderer
 } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-import RAPIER from 'https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.11.2/rapier.es.js';
 
 const canvas = document.querySelector('#viewport');
 const statusMessage = document.querySelector('#status-message');
@@ -42,17 +40,24 @@ const fillLight = new DirectionalLight('#f472b6', 0.3);
 fillLight.position.set(-4, 2, -5);
 scene.add(ambient, keyLight, fillLight);
 
-const geometry = new BoxGeometry(1.5, 1, 1.5);
-const material = new MeshStandardMaterial({
+const groundGeometry = new BoxGeometry(10, 0.2, 10);
+const groundMaterial = new MeshStandardMaterial({
+  color: '#1e293b',
+  roughness: 0.85,
+  metalness: 0.05
+});
+const ground = new Mesh(groundGeometry, groundMaterial);
+ground.position.y = -0.6;
+scene.add(ground);
+
+const cubeGeometry = new BoxGeometry(1, 1, 1);
+const cubeMaterial = new MeshStandardMaterial({
   color: '#38bdf8',
   roughness: 0.35,
   metalness: 0.1
 });
-const cube = new Mesh(geometry, material);
+const cube = new Mesh(cubeGeometry, cubeMaterial);
 scene.add(cube);
-
-const clock = new Clock();
-let spinning = true;
 
 function resize() {
   const width = canvas.clientWidth;
@@ -68,37 +73,91 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-function render() {
-  const delta = clock.getDelta();
-  if (spinning) {
-    cube.rotation.y += delta * 0.8;
-    cube.rotation.x += delta * 0.4;
-  }
+renderer.setAnimationLoop(() => {
   renderer.render(scene, camera);
-  requestAnimationFrame(render);
-}
-
-requestAnimationFrame(render);
-
-actionButton?.addEventListener('click', () => {
-  spinning = !spinning;
-  actionButton.textContent = spinning ? 'Pause Spin' : 'Resume Spin';
 });
 
-async function initPhysics() {
-  try {
-    statusMessage.textContent = 'Initializing Rapier physics…';
-    await RAPIER.init();
-    const gravity = new RAPIER.Vector3(0, -9.81, 0);
-    const world = new RAPIER.World(gravity);
-    statusMessage.textContent = 'Three.js and Rapier are ready. Placeholder cube is spinning!';
-    console.info('Rapier world created with gravity', world.gravity);
-    // Clean up temporary world until physics worker lands.
-    world.free();
-  } catch (error) {
-    console.error('Failed to load Rapier', error);
-    statusMessage.textContent = 'Failed to initialize physics. Check the console for details.';
-  }
+const physicsWorker = new Worker(
+  new URL('../workers/physics.worker.js', import.meta.url),
+  { type: 'module' }
+);
+let workerReady = false;
+let physicsRunning = false;
+let lastLogTimestamp = 0;
+
+if (actionButton) {
+  actionButton.disabled = true;
 }
 
-initPhysics();
+physicsWorker.addEventListener('message', (event) => {
+  const data = event.data;
+  if (!data || typeof data !== 'object') {
+    return;
+  }
+
+  if (data.type === 'ready') {
+    workerReady = true;
+    if (statusMessage) {
+      statusMessage.textContent =
+        'Physics worker ready. Starting Rapier drop test…';
+    }
+    if (actionButton) {
+      actionButton.disabled = false;
+    }
+    physicsWorker.postMessage({ type: 'start' });
+  } else if (data.type === 'state') {
+    physicsRunning = Boolean(data.running);
+    if (actionButton) {
+      actionButton.textContent = physicsRunning
+        ? 'Pause Simulation'
+        : 'Resume Simulation';
+    }
+    if (statusMessage) {
+      statusMessage.textContent = physicsRunning
+        ? 'Rapier is stepping inside a worker. Watch the cube fall and settle.'
+        : 'Simulation paused. Resume to continue the drop test.';
+    }
+  } else if (data.type === 'tick') {
+    const cubeState = Array.isArray(data.bodies)
+      ? data.bodies.find((body) => body?.id === 'test-cube')
+      : undefined;
+    if (cubeState) {
+      const { translation, rotation } = cubeState;
+      if (translation) {
+        cube.position.set(translation.x, translation.y, translation.z);
+      }
+      if (rotation) {
+        cube.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
+      }
+      if (typeof data.timestamp === 'number') {
+        if (data.timestamp - lastLogTimestamp >= 500) {
+          console.info(
+            '[Physics Worker] cube height:',
+            translation.y.toFixed(3)
+          );
+          lastLogTimestamp = data.timestamp;
+        }
+      }
+    }
+  } else if (data.type === 'error') {
+    console.error('Physics worker failed to initialize:', data.message);
+    if (statusMessage) {
+      statusMessage.textContent =
+        'Physics worker failed to start. Check the console for details.';
+    }
+    if (actionButton) {
+      actionButton.disabled = true;
+    }
+  }
+});
+
+actionButton?.addEventListener('click', () => {
+  if (!workerReady) {
+    return;
+  }
+  physicsWorker.postMessage({ type: physicsRunning ? 'pause' : 'start' });
+});
+
+window.addEventListener('beforeunload', () => {
+  physicsWorker.terminate();
+});

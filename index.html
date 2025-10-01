@@ -19,11 +19,11 @@
       <section class="info-panel">
         <h2>Welcome</h2>
         <p>
-          The project skeleton is ready. Three.js renders a placeholder cube and Rapier’s WebAssembly
-          bundle initializes in the background. Future phases will swap this message with real evolution
-          controls and analytics.
+          The physics core now runs inside a dedicated Web Worker. Rapier’s WebAssembly module drops a
+          test cube onto a static platform while the main thread renders the scene with Three.js. Use the
+          control button to pause or resume the simulation loop.
         </p>
-        <button id="action-button" type="button">Pause Spin</button>
+        <button id="action-button" type="button">Pause Simulation</button>
       </section>
     </main>
     <footer class="site-footer">
