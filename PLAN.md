@@ -40,13 +40,13 @@
   - **Outputs:** Stepper running physics loop
   - **DoD:** Logs position updates from Worker
   - **Dependencies:** P1-01
-- [ ] **P1-03: Shared Memory Protocol (optional)**
+- [x] **P1-03: Shared Memory Protocol (optional)**
   - **Owner:** Platform Agent
   - **Inputs:** SharedArrayBuffer via COOP/COEP headers (local server required)
   - **Outputs:** Snapshot arrays passed from worker to main
   - **DoD:** Renderer reads transforms without blocking
   - **Dependencies:** P1-02
-  - **Status:** Deferred until cross-origin isolation is required.
+  - **Status:** Implemented shared memory snapshots with COOP/COEP development server support.
 
 ---
 

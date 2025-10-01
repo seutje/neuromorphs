@@ -59,6 +59,23 @@ const cubeMaterial = new MeshStandardMaterial({
 const cube = new Mesh(cubeGeometry, cubeMaterial);
 scene.add(cube);
 
+const sharedBodyMeshes = {
+  'test-cube': cube
+};
+
+const META_DEFAULT_VERSION_INDEX = 0;
+const META_DEFAULT_WRITE_LOCK_INDEX = 1;
+
+let sharedStateMeta = null;
+let sharedStateFloats = null;
+let sharedStateLayout = null;
+let sharedStateVersion = 0;
+let sharedStateEnabled = false;
+
+const rendererClock = {
+  lastLogTimestamp: 0
+};
+
 function resize() {
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
@@ -73,7 +90,70 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
+function updateSharedTransforms() {
+  if (!sharedStateMeta || !sharedStateFloats || !sharedStateLayout) {
+    return;
+  }
+  const {
+    metaLength,
+    floatsPerBody,
+    bodyIds,
+    metaIndices
+  } = sharedStateLayout;
+  if (!Array.isArray(bodyIds) || bodyIds.length === 0 || !floatsPerBody) {
+    return;
+  }
+  const versionIndex = metaIndices?.version ?? META_DEFAULT_VERSION_INDEX;
+  const writeLockIndex = metaIndices?.writeLock ?? META_DEFAULT_WRITE_LOCK_INDEX;
+  if (versionIndex >= metaLength || writeLockIndex >= metaLength) {
+    return;
+  }
+  const writeLock = Atomics.load(sharedStateMeta, writeLockIndex);
+  if (writeLock !== 0) {
+    return;
+  }
+  const version = Atomics.load(sharedStateMeta, versionIndex);
+  if (version === sharedStateVersion) {
+    return;
+  }
+  sharedStateVersion = version;
+  for (let i = 0; i < bodyIds.length; i += 1) {
+    const bodyId = bodyIds[i];
+    const mesh = sharedBodyMeshes[bodyId];
+    if (!mesh) {
+      continue;
+    }
+    const baseIndex = i * floatsPerBody;
+    const px = sharedStateFloats[baseIndex];
+    const py = sharedStateFloats[baseIndex + 1];
+    const pz = sharedStateFloats[baseIndex + 2];
+    const rx = sharedStateFloats[baseIndex + 3];
+    const ry = sharedStateFloats[baseIndex + 4];
+    const rz = sharedStateFloats[baseIndex + 5];
+    const rw = sharedStateFloats[baseIndex + 6];
+    if (Number.isFinite(px) && Number.isFinite(py) && Number.isFinite(pz)) {
+      mesh.position.set(px, py, pz);
+    }
+    if (
+      Number.isFinite(rx) &&
+      Number.isFinite(ry) &&
+      Number.isFinite(rz) &&
+      Number.isFinite(rw)
+    ) {
+      mesh.quaternion.set(rx, ry, rz, rw);
+    }
+  }
+  const now = performance.now();
+  if (now - rendererClock.lastLogTimestamp >= 500) {
+    rendererClock.lastLogTimestamp = now;
+    console.info('[Shared State] cube height:', cube.position.y.toFixed(3));
+  }
+}
+
 renderer.setAnimationLoop(() => {
+  if (sharedStateEnabled) {
+    updateSharedTransforms();
+  }
   renderer.render(scene, camera);
 });
 
@@ -105,6 +185,40 @@ physicsWorker.addEventListener('message', (event) => {
       actionButton.disabled = false;
     }
     physicsWorker.postMessage({ type: 'start' });
+  } else if (data.type === 'shared-state') {
+    if (data.buffer instanceof SharedArrayBuffer && data.layout) {
+      const metaLength = data.layout.metaLength ?? 0;
+      const floatsPerBody = data.layout.floatsPerBody ?? 0;
+      const bodyIds = Array.isArray(data.layout.bodyIds)
+        ? data.layout.bodyIds
+        : [];
+      const bodyCount = data.layout.bodyCount ?? bodyIds.length;
+      if (metaLength > 0 && floatsPerBody > 0 && bodyCount > 0) {
+        const metaBytes = metaLength * Int32Array.BYTES_PER_ELEMENT;
+        sharedStateMeta = new Int32Array(data.buffer, 0, metaLength);
+        sharedStateFloats = new Float32Array(
+          data.buffer,
+          metaBytes,
+          bodyCount * floatsPerBody
+        );
+        sharedStateLayout = {
+          ...data.layout,
+          bodyCount,
+          bodyIds
+        };
+        sharedStateVersion = Atomics.load(
+          sharedStateMeta,
+          data.layout.metaIndices?.version ?? META_DEFAULT_VERSION_INDEX
+        );
+        sharedStateEnabled = true;
+        if (statusMessage) {
+          statusMessage.textContent =
+            'Shared memory bridge established. Rendering live physics state.';
+        }
+      }
+    }
+  } else if (data.type === 'shared-state-error') {
+    console.warn('Shared memory unavailable:', data.message);
   } else if (data.type === 'state') {
     physicsRunning = Boolean(data.running);
     if (actionButton) {
@@ -112,31 +226,44 @@ physicsWorker.addEventListener('message', (event) => {
         ? 'Pause Simulation'
         : 'Resume Simulation';
     }
-    if (statusMessage) {
+    if (statusMessage && !sharedStateEnabled) {
       statusMessage.textContent = physicsRunning
         ? 'Rapier is stepping inside a worker. Watch the cube fall and settle.'
         : 'Simulation paused. Resume to continue the drop test.';
     }
   } else if (data.type === 'tick') {
-    const cubeState = Array.isArray(data.bodies)
-      ? data.bodies.find((body) => body?.id === 'test-cube')
-      : undefined;
-    if (cubeState) {
-      const { translation, rotation } = cubeState;
-      if (translation) {
-        cube.position.set(translation.x, translation.y, translation.z);
-      }
-      if (rotation) {
-        cube.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
-      }
-      if (typeof data.timestamp === 'number') {
-        if (data.timestamp - lastLogTimestamp >= 500) {
-          console.info(
-            '[Physics Worker] cube height:',
-            translation.y.toFixed(3)
-          );
-          lastLogTimestamp = data.timestamp;
+    const useSharedState = sharedStateEnabled && sharedStateMeta;
+    if (!useSharedState) {
+      const cubeState = Array.isArray(data.bodies)
+        ? data.bodies.find((body) => body?.id === 'test-cube')
+        : undefined;
+      if (cubeState) {
+        const { translation, rotation } = cubeState;
+        if (translation) {
+          cube.position.set(translation.x, translation.y, translation.z);
         }
+        if (rotation) {
+          cube.quaternion.set(
+            rotation.x,
+            rotation.y,
+            rotation.z,
+            rotation.w
+          );
+        }
+        if (typeof data.timestamp === 'number') {
+          if (data.timestamp - lastLogTimestamp >= 500) {
+            console.info(
+              '[Physics Worker] cube height:',
+              translation.y.toFixed(3)
+            );
+            lastLogTimestamp = data.timestamp;
+          }
+        }
+      }
+    } else if (typeof data.version === 'number') {
+      if (statusMessage && physicsRunning) {
+        statusMessage.textContent =
+          'Shared memory synchronized. Cube state streaming from worker.';
       }
     }
   } else if (data.type === 'error') {
@@ -156,8 +283,4 @@ actionButton?.addEventListener('click', () => {
     return;
   }
   physicsWorker.postMessage({ type: physicsRunning ? 'pause' : 'start' });
-});
-
-window.addEventListener('beforeunload', () => {
-  physicsWorker.terminate();
 });
