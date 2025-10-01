@@ -3,6 +3,11 @@ import {
   buildMorphologyBlueprint,
   createDefaultMorphGenome
 } from '../genomes/morphGenome.js';
+import {
+  buildControllerBlueprint,
+  createDefaultControllerGenome
+} from '../genomes/ctrlGenome.js';
+import { createControllerRuntime } from './controllerRuntime.js';
 
 const META_LENGTH = 2;
 const META_VERSION_INDEX = 0;
@@ -24,6 +29,34 @@ let creatureBodies = new Map();
 let creatureJoints = [];
 let bodyOrder = [];
 let bodyDescriptorsCache = [];
+let creatureJointDescriptors = [];
+let creatureJointMap = new Map();
+let controllerRuntime = null;
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function normalizeVector([x, y, z]) {
+  const length = Math.hypot(x, y, z);
+  if (length === 0) {
+    return [0, 0, 0];
+  }
+  return [x / length, y / length, z / length];
+}
+
+function applyQuaternion([qx, qy, qz, qw], [vx, vy, vz]) {
+  const ix = qw * vx + qy * vz - qz * vy;
+  const iy = qw * vy + qz * vx - qx * vz;
+  const iz = qw * vz + qx * vy - qy * vx;
+  const iw = -qx * vx - qy * vy - qz * vz;
+
+  return [
+    ix * qw + iw * -qx + iy * -qz - iz * -qy,
+    iy * qw + iw * -qy + iz * -qx - ix * -qz,
+    iz * qw + iw * -qz + ix * -qy - iy * -qx
+  ];
+}
 
 function clearCreature() {
   if (!world) {
@@ -41,6 +74,9 @@ function clearCreature() {
   creatureBodies.clear();
   bodyOrder = [];
   bodyDescriptorsCache = [];
+  creatureJointDescriptors = [];
+  creatureJointMap.clear();
+  controllerRuntime = null;
 }
 
 function configureSharedState(bodyDescriptors, materials) {
@@ -163,6 +199,9 @@ function resetCreature() {
     entry.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     entry.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
   });
+  if (controllerRuntime) {
+    controllerRuntime.reset();
+  }
   syncSharedState();
 }
 
@@ -223,17 +262,21 @@ function instantiateCreature(genome) {
       .setDensity(descriptor.density ?? 1)
       .setFriction(descriptor.material?.friction ?? 0.9)
       .setRestitution(descriptor.material?.restitution ?? 0.2);
-    world.createCollider(colliderDesc, rigidBody);
+    const collider = world.createCollider(colliderDesc, rigidBody);
 
     creatureBodies.set(descriptor.id, {
       body: rigidBody,
       initialTranslation: [...descriptor.translation],
-      initialRotation: [...descriptor.rotation]
+      initialRotation: [...descriptor.rotation],
+      halfExtents: [...descriptor.halfExtents],
+      collider
     });
     bodyOrder.push(descriptor.id);
   });
 
   creatureJoints = [];
+  creatureJointDescriptors = [];
+  creatureJointMap.clear();
   blueprint.joints.forEach((jointDef) => {
     const parentEntry = creatureBodies.get(jointDef.parentId);
     const childEntry = creatureBodies.get(jointDef.childId);
@@ -282,6 +325,16 @@ function instantiateCreature(genome) {
       }
     }
     creatureJoints.push(jointHandle);
+    const descriptor = {
+      id: jointDef.id,
+      parentId: jointDef.parentId,
+      childId: jointDef.childId,
+      axis: [...jointDef.axis],
+      limits: jointDef.limits ? [...jointDef.limits] : null,
+      handle: jointHandle
+    };
+    creatureJointDescriptors.push(descriptor);
+    creatureJointMap.set(descriptor.id, descriptor);
   });
 
   bodyDescriptorsCache = descriptors.map((descriptor) => ({
@@ -295,7 +348,148 @@ function instantiateCreature(genome) {
 
   configureSharedState(bodyDescriptorsCache, materialMap);
   syncSharedState();
+
+  const controllerGenome = createDefaultControllerGenome();
+  const controllerBlueprint = buildControllerBlueprint(controllerGenome);
+  if (controllerBlueprint.errors.length > 0) {
+    postMessage({
+      type: 'error',
+      message: `Failed to build controller: ${controllerBlueprint.errors.join('; ')}`
+    });
+  } else {
+    controllerRuntime = createControllerRuntime(controllerBlueprint);
+    if (!controllerRuntime) {
+      postMessage({
+        type: 'error',
+        message: 'Controller runtime failed to initialize.'
+      });
+    }
+  }
   return true;
+}
+
+function gatherSensorSnapshot() {
+  const bodies = [];
+  const bodyMap = new Map();
+  creatureBodies.forEach((entry, bodyId) => {
+    const translation = entry.body.translation();
+    const linvel = entry.body.linvel();
+    const angvel = entry.body.angvel();
+    const halfExtents = entry.halfExtents || [0.5, 0.5, 0.5];
+    const footHeight = translation.y - halfExtents[1];
+    const contact = footHeight <= -0.48;
+    const snapshot = {
+      id: bodyId,
+      height: translation.y,
+      velocity: {
+        x: linvel.x,
+        y: linvel.y,
+        z: linvel.z
+      },
+      speed: Math.hypot(linvel.x, linvel.y, linvel.z),
+      angularVelocity: {
+        x: angvel.x,
+        y: angvel.y,
+        z: angvel.z
+      },
+      contact
+    };
+    bodies.push(snapshot);
+    bodyMap.set(bodyId, snapshot);
+  });
+
+  const joints = creatureJointDescriptors.map((descriptor) => {
+    const joint = descriptor.handle;
+    let angle = 0;
+    let velocity = 0;
+    if (joint) {
+      try {
+        if (typeof joint.angles === 'function') {
+          const result = joint.angles();
+          if (Array.isArray(result)) {
+            angle = Number(result[0]) || 0;
+          } else {
+            angle = Number(result) || 0;
+          }
+        } else if (typeof joint.angle === 'function') {
+          angle = Number(joint.angle()) || 0;
+        }
+      } catch (error) {
+        angle = 0;
+      }
+      try {
+        if (typeof joint.angularVelocity === 'function') {
+          velocity = Number(joint.angularVelocity()) || 0;
+        }
+      } catch (error) {
+        velocity = 0;
+      }
+    }
+    return {
+      id: descriptor.id,
+      parentId: descriptor.parentId,
+      childId: descriptor.childId,
+      angle,
+      velocity,
+      limits: descriptor.limits ? [...descriptor.limits] : null
+    };
+  });
+
+  const rootId = bodyOrder[0];
+  const root = rootId ? bodyMap.get(rootId) : null;
+  const footCandidate = bodies.find((body) => body.id !== rootId) || null;
+  const summary = {
+    rootHeight: root?.height ?? 0,
+    rootVelocityY: root?.velocity?.y ?? 0,
+    rootSpeed: root?.speed ?? 0,
+    footContact: footCandidate?.contact ?? false,
+    primaryJointAngle: joints[0]?.angle ?? 0,
+    primaryJointVelocity: joints[0]?.velocity ?? 0
+  };
+
+  return {
+    bodies,
+    joints,
+    summary
+  };
+}
+
+function applyControllerCommands(result) {
+  if (!result || !Array.isArray(result.commands)) {
+    return;
+  }
+  result.commands.forEach((command) => {
+    if (!command || command.target?.type !== 'joint') {
+      return;
+    }
+    const descriptor = creatureJointMap.get(command.target.id);
+    if (!descriptor) {
+      return;
+    }
+    const parentEntry = creatureBodies.get(descriptor.parentId);
+    const childEntry = creatureBodies.get(descriptor.childId);
+    if (!parentEntry || !childEntry) {
+      return;
+    }
+    const axis = normalizeVector(descriptor.axis || [0, 1, 0]);
+    const parentRotation = parentEntry.body.rotation();
+    const worldAxis = applyQuaternion(
+      [parentRotation.x, parentRotation.y, parentRotation.z, parentRotation.w],
+      axis
+    );
+    const torqueStrength = 18;
+    const torqueMagnitude = clamp(command.value ?? 0, -1, 1) * torqueStrength;
+    const torque = {
+      x: worldAxis[0] * torqueMagnitude,
+      y: worldAxis[1] * torqueMagnitude,
+      z: worldAxis[2] * torqueMagnitude
+    };
+    childEntry.body.applyTorqueImpulse(torque, true);
+    parentEntry.body.applyTorqueImpulse(
+      { x: -torque.x, y: -torque.y, z: -torque.z },
+      true
+    );
+  });
 }
 
 async function initializeWorld() {
@@ -357,6 +551,14 @@ function stepSimulation() {
     return;
   }
 
+  const dt = world.timestep ?? 1 / 60;
+  const sensors = gatherSensorSnapshot();
+  let controllerResult = null;
+  if (controllerRuntime) {
+    controllerResult = controllerRuntime.update(dt, sensors);
+    applyControllerCommands(controllerResult);
+  }
+
   world.step();
 
   if (sharedFloats) {
@@ -365,13 +567,18 @@ function stepSimulation() {
 
   const payload = {
     type: 'tick',
-    timestamp: performance.now()
+    timestamp: performance.now(),
+    sensors
   };
 
   if (sharedFloats) {
     payload.version = Atomics.load(sharedMeta, META_VERSION_INDEX);
   } else {
     payload.bodies = collectBodyStates();
+  }
+
+  if (controllerResult?.nodeOutputs) {
+    payload.controller = controllerResult.nodeOutputs;
   }
 
   postMessage(payload);
