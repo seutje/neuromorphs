@@ -13,6 +13,7 @@ const META_LENGTH = 2;
 const META_VERSION_INDEX = 0;
 const META_WRITE_LOCK_INDEX = 1;
 const FLOATS_PER_BODY = 7;
+const MAX_JOINT_ANGULAR_DELTA = 15; // rad/s per simulation step
 
 let world = null;
 let running = false;
@@ -56,6 +57,30 @@ function applyQuaternion([qx, qy, qz, qw], [vx, vy, vz]) {
     iy * qw + iw * -qy + iz * -qx - ix * -qz,
     iz * qw + iw * -qz + ix * -qy - iy * -qx
   ];
+}
+
+function projectAngularInertia(matrix, axis) {
+  if (!matrix || !matrix.elements || !Array.isArray(axis)) {
+    return 0;
+  }
+  const [m11, m12, m13, m22, m23, m33] = matrix.elements;
+  const [x, y, z] = axis;
+  return (
+    m11 * x * x +
+    2 * m12 * x * y +
+    2 * m13 * x * z +
+    m22 * y * y +
+    2 * m23 * y * z +
+    m33 * z * z
+  );
+}
+
+function normalizeVector3({ x, y, z }) {
+  const length = Math.hypot(x, y, z);
+  if (length === 0) {
+    return null;
+  }
+  return { x: x / length, y: y / length, z: z / length };
 }
 
 function clearCreature() {
@@ -473,18 +498,46 @@ function applyControllerCommands(result) {
     }
     const axis = normalizeVector(descriptor.axis || [0, 1, 0]);
     const parentRotation = parentEntry.body.rotation();
-    const worldAxis = applyQuaternion(
+    const worldAxisVector = applyQuaternion(
       [parentRotation.x, parentRotation.y, parentRotation.z, parentRotation.w],
       axis
     );
-    const dt = typeof world?.timestep === 'number' ? world.timestep : 1 / 60;
-    const torqueScale = 540;
-    const torqueImpulseMagnitude =
-      clamp(command.value ?? 0, -1, 1) * torqueScale * dt;
+    const normalizedAxis = normalizeVector3({
+      x: worldAxisVector[0],
+      y: worldAxisVector[1],
+      z: worldAxisVector[2]
+    });
+    if (!normalizedAxis) {
+      return;
+    }
+    const commandValue = clamp(command.value ?? 0, -1, 1);
+    if (commandValue === 0) {
+      return;
+    }
+    const parentInertiaMatrix = parentEntry.body.effectiveAngularInertia(normalizedAxis);
+    const childInertiaMatrix = childEntry.body.effectiveAngularInertia(normalizedAxis);
+    const parentInertia = projectAngularInertia(parentInertiaMatrix, [
+      normalizedAxis.x,
+      normalizedAxis.y,
+      normalizedAxis.z
+    ]);
+    const childInertia = projectAngularInertia(childInertiaMatrix, [
+      normalizedAxis.x,
+      normalizedAxis.y,
+      normalizedAxis.z
+    ]);
+    const baseInertia = Math.min(parentInertia, childInertia);
+    if (!Number.isFinite(baseInertia) || baseInertia <= 0) {
+      return;
+    }
+    const impulseMagnitude = commandValue * baseInertia * MAX_JOINT_ANGULAR_DELTA;
+    if (impulseMagnitude === 0) {
+      return;
+    }
     const torque = {
-      x: worldAxis[0] * torqueImpulseMagnitude,
-      y: worldAxis[1] * torqueImpulseMagnitude,
-      z: worldAxis[2] * torqueImpulseMagnitude
+      x: normalizedAxis.x * impulseMagnitude,
+      y: normalizedAxis.y * impulseMagnitude,
+      z: normalizedAxis.z * impulseMagnitude
     };
     childEntry.body.applyTorqueImpulse(torque, true);
     parentEntry.body.applyTorqueImpulse(
