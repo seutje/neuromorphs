@@ -11,7 +11,7 @@ import {
   Vector3,
   WebGLRenderer
 } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-import RAPIER from 'https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.11.2/rapier3d-compat.es.js';
+import RAPIER from 'https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.11.2/rapier.es.js';
 
 const canvas = document.querySelector('#viewport');
 const statusMessage = document.querySelector('#status-message');
