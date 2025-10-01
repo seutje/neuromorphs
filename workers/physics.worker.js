@@ -518,14 +518,14 @@ function gatherSensorSnapshot() {
         } else if (typeof joint.angle === 'function') {
           angle = Number(joint.angle()) || 0;
         }
-      } catch (error) {
+      } catch (_error) {
         angle = 0;
       }
       try {
         if (typeof joint.angularVelocity === 'function') {
           velocity = Number(joint.angularVelocity()) || 0;
         }
-      } catch (error) {
+      } catch (_error) {
         velocity = 0;
       }
     }
