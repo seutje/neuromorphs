@@ -309,11 +309,12 @@ function resetCreature() {
   syncSharedState();
 }
 
-function instantiateCreature(genome) {
+function instantiateCreature(morphGenome, controllerGenome) {
   if (!world) {
     return false;
   }
-  const blueprint = buildMorphologyBlueprint(genome);
+  const morph = morphGenome ?? createDefaultMorphGenome();
+  const blueprint = buildMorphologyBlueprint(morph);
   if (blueprint.errors.length > 0) {
     postMessage({
       type: 'error',
@@ -453,8 +454,8 @@ function instantiateCreature(genome) {
   configureSharedState(bodyDescriptorsCache, materialMap);
   syncSharedState();
 
-  const controllerGenome = createDefaultControllerGenome();
-  const controllerBlueprint = buildControllerBlueprint(controllerGenome);
+  const controllerSource = controllerGenome ?? createDefaultControllerGenome();
+  const controllerBlueprint = buildControllerBlueprint(controllerSource);
   if (controllerBlueprint.errors.length > 0) {
     postMessage({
       type: 'error',
@@ -636,8 +637,9 @@ async function initializeWorld() {
     const floorCollider = RAPIER.ColliderDesc.cuboid(7, 0.1, 6).setTranslation(0, -0.6, 0);
     world.createCollider(floorCollider);
 
-    const defaultGenome = createDefaultMorphGenome();
-    const spawned = instantiateCreature(defaultGenome);
+    const defaultMorph = createDefaultMorphGenome();
+    const defaultController = createDefaultControllerGenome();
+    const spawned = instantiateCreature(defaultMorph, defaultController);
     if (!spawned) {
       throw new Error('Default morph failed to spawn.');
     }
@@ -777,6 +779,15 @@ self.addEventListener('message', (event) => {
   } else if (data.type === 'reset') {
     stopReplayPlayback({ notify: false });
     resetCreature();
+  } else if (data.type === 'preview-individual') {
+    const individual =
+      data.individual && typeof data.individual === 'object' ? data.individual : null;
+    stopReplayPlayback({ notify: false });
+    setRunning(false);
+    const spawned = instantiateCreature(individual?.morph, individual?.controller);
+    if (spawned) {
+      setRunning(true);
+    }
   } else if (data.type === 'play-replay') {
     const buffer = data.buffer instanceof ArrayBuffer ? data.buffer : null;
     if (!buffer) {
