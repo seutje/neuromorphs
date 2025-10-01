@@ -15,6 +15,8 @@ Use 2-space indentation for HTML, JS, and CSS. Prefer named ESM exports and keep
 ## Testing Guidelines
 Author tests as pure ESM modules in `tests/`, naming files `*.test.js` to mirror source paths. Fix the random seed inside each test and load fixtures from `fixtures/*.json` when comparing genomes or replays. Target ≥80% coverage on evolution-critical modules and attach coverage output or manual steps to each PR.
 
+Always add unit tests alongside new functionality and include regression tests whenever you fix a bug to prevent regressions.
+
 ## Commit & Pull Request Guidelines
 Current history is minimal, so adopt Conventional Commits (`feat:`, `fix:`, `docs:`) written in the imperative mood ≤72 characters. Reference issues with `Refs #id` in the body, and describe behavioural changes plus manual/automated test evidence in the PR template. Include screenshots or short clips for UI updates and tag domain reviewers (engine, UI, physics) explicitly.
 

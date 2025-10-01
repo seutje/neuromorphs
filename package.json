@@ -4,6 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "serve": "node scripts/dev-server.mjs"
+    "serve": "node scripts/dev-server.mjs",
+    "test": "jest"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.24.7",
+    "babel-jest": "^29.7.0",
+    "jest": "^29.7.0"
   }
 }
