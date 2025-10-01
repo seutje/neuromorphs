@@ -4,6 +4,7 @@ import { instantiateCreature } from './simulation/instantiateCreature.js';
 import { gatherSensorSnapshot } from './simulation/sensors.js';
 import { applyControllerCommands } from './simulation/controllerCommands.js';
 import { computeCenterOfMass } from './simulation/centerOfMass.js';
+import { yieldToMainThread } from './yield.js';
 
 function recordSample(instance, trace, timestamp, sensors) {
   const centerOfMass = computeCenterOfMass(instance);
@@ -53,6 +54,7 @@ export async function simulateLocomotion({
       const timestamp = (step + 1) * dt;
       if ((step + 1) % sampleSteps === 0 || step === totalSteps - 1) {
         recordSample(instance, trace, timestamp, sensors);
+        await yieldToMainThread({ signal });
       }
 
       if ((sensors.summary?.rootHeight ?? 0) < -2) {

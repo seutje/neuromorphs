@@ -1,5 +1,6 @@
 import { createRng, splitRng } from './rng.js';
 import { mutateCompositeGenome } from './mutation.js';
+import { yieldToMainThread } from './yield.js';
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -164,7 +165,7 @@ export async function runEvolution({
       history.push(clone(generationSummary));
 
       if (typeof onGeneration === 'function') {
-        onGeneration({
+        await onGeneration({
           generation: step,
           absoluteGeneration: generation,
           bestFitness,
@@ -178,6 +179,8 @@ export async function runEvolution({
           }))
         });
       }
+
+      await yieldToMainThread({ signal });
 
       if (typeof logger?.info === 'function') {
         logger.info(
