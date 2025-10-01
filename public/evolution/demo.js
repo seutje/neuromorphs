@@ -86,11 +86,10 @@ export function startDemoOnLoad() {
       if (!final) {
         return;
       }
+      const bestFitness = Number(final.bestFitness ?? 0).toFixed(3);
+      const meanFitness = Number(final.meanFitness ?? 0).toFixed(3);
       console.info(
-        '[EA Demo] generations=%s bestFitness=%.3f meanFitness=%.3f',
-        result.history.length,
-        final.bestFitness,
-        final.meanFitness
+        `[EA Demo] generations=${result.history.length} bestFitness=${bestFitness} meanFitness=${meanFitness}`
       );
     })
     .catch((error) => {
