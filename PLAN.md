@@ -75,23 +75,26 @@
 ---
 
 ## Phase 3 — Controllers (Neurocontrollers)
-- [ ] **P3-01: Controller Schema (JSON)**
+- [x] **P3-01: Controller Schema (JSON)**
   - **Owner:** Control Agent
   - **Outputs:** `ctrlGenome.js` with node/edge structure
   - **DoD:** Unit test: add node/edge, serialize, deserialize
   - **Dependencies:** P0-03
-- [ ] **P3-02: Sensors in Physics Worker**
+  - **Status:** Added a controller genome module with default oscillator network, validation helpers, and serialization utilities covered by Jest tests.
+- [x] **P3-02: Sensors in Physics Worker**
   - **Owner:** Physics Agent
   - **Inputs:** Physics state
   - **Outputs:** JSON sensor data (angles, velocities, contacts)
   - **DoD:** Console logs stable sensor outputs
   - **Dependencies:** P1-02
-- [ ] **P3-03: Controller Runtime**
+  - **Status:** Physics worker now exports structured body and joint sensor snapshots each tick and the UI logs height/contact telemetry.
+- [x] **P3-03: Controller Runtime**
   - **Owner:** Control Agent
   - **Inputs:** Genome + Sensors
   - **Outputs:** Actuator commands per joint
   - **DoD:** Oscillatory movement visible in sim
   - **Dependencies:** P3-01, P3-02
+  - **Status:** Integrated a runtime that evaluates the controller genome, drives joint torques, and streams actuator debug data alongside physics updates.
 
 ---
 

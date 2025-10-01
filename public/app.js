@@ -304,6 +304,7 @@ const physicsWorker = new Worker(
 let workerReady = false;
 let physicsRunning = false;
 let lastLogTimestamp = 0;
+let sensorLogTimestamp = 0;
 
 if (actionButton) {
   actionButton.disabled = true;
@@ -447,6 +448,21 @@ physicsWorker.addEventListener('message', (event) => {
       if (statusMessage && physicsRunning) {
         statusMessage.textContent =
           'Shared memory synchronized. Hopper pose streaming from worker.';
+      }
+    }
+    if (data.sensors?.summary && typeof data.timestamp === 'number') {
+      if (data.timestamp - sensorLogTimestamp >= 500) {
+        const summary = data.sensors.summary;
+        const height = Number(summary.rootHeight ?? 0).toFixed(3);
+        const contact = summary.footContact ? 'yes' : 'no';
+        const angle = Number(summary.primaryJointAngle ?? 0).toFixed(3);
+        console.info(
+          '[Sensors] height=%sm, contact=%s, jointAngle=%srad',
+          height,
+          contact,
+          angle
+        );
+        sensorLogTimestamp = data.timestamp;
       }
     }
   } else if (data.type === 'error') {
