@@ -1,6 +1,7 @@
 import { createViewer } from './render/viewer.js';
 import { createViewControls } from './ui/viewControls.js';
 import { createEvolutionPanel } from './ui/evolutionPanel.js';
+import { createGenerationViewer } from './ui/generationViewer.js';
 import { runEvolutionDemo } from './evolution/demo.js';
 import {
   saveRunState,
@@ -21,6 +22,22 @@ const evolutionProgress = document.querySelector('#evolution-progress');
 const statGeneration = document.querySelector('#stat-generation');
 const statBest = document.querySelector('#stat-best');
 const statMean = document.querySelector('#stat-mean');
+const generationViewerContainer = document.querySelector('#generation-viewer');
+const generationSlider = document.querySelector('#generation-slider');
+const generationPlayButton = document.querySelector('#generation-play');
+const generationLatestButton = document.querySelector('#generation-latest');
+const generationTimeline = document.querySelector('#generation-timeline');
+const generationSummaryNodes = {
+  generation: document.querySelector('#generation-summary-generation'),
+  count: document.querySelector('#generation-summary-count'),
+  best: document.querySelector('#generation-summary-best'),
+  mean: document.querySelector('#generation-summary-mean'),
+  displacement: document.querySelector('#generation-summary-displacement'),
+  speed: document.querySelector('#generation-summary-speed'),
+  height: document.querySelector('#generation-summary-height'),
+  upright: document.querySelector('#generation-summary-upright'),
+  runtime: document.querySelector('#generation-summary-runtime')
+};
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -33,6 +50,7 @@ let persistedRunState = loadRunState() ?? null;
 let latestReplay = loadReplayRecord() ?? null;
 let activeRunConfig = null;
 let activeRunTotalGenerations = 0;
+let generationViewer = null;
 
 function applyConfigToForm(config) {
   if (!config || !evolutionForm) {
@@ -54,6 +72,35 @@ function applyConfigToForm(config) {
   assign('controllerAddConnectionChance', config.controllerMutation?.addConnectionChance ?? 0.45);
 }
 
+function resolveBestMetrics(entry) {
+  if (!entry) {
+    return null;
+  }
+  if (entry.bestMetrics) {
+    return deepClone(entry.bestMetrics);
+  }
+  if (Array.isArray(entry.evaluated) && entry.evaluated.length > 0) {
+    const bestId = entry.bestIndividual?.id ?? entry.evaluated[0]?.id;
+    const candidate =
+      entry.evaluated.find((evaluated) => evaluated.id === bestId) ?? entry.evaluated[0];
+    return candidate?.metrics ? deepClone(candidate.metrics) : null;
+  }
+  return null;
+}
+
+function buildGenerationViewerEntry(entry, absoluteGeneration) {
+  if (!entry) {
+    return null;
+  }
+  return {
+    generation: Number.isFinite(absoluteGeneration) ? Number(absoluteGeneration) : 0,
+    bestFitness: Number.isFinite(entry.bestFitness) ? Number(entry.bestFitness) : 0,
+    meanFitness: Number.isFinite(entry.meanFitness) ? Number(entry.meanFitness) : 0,
+    bestMetrics: resolveBestMetrics(entry),
+    bestIndividual: entry.bestIndividual ? deepClone(entry.bestIndividual) : null
+  };
+}
+
 function handleGenerationUpdate(entry) {
   if (!entry) {
     return;
@@ -71,6 +118,12 @@ function handleGenerationUpdate(entry) {
     bestFitness: entry.bestFitness,
     meanFitness: entry.meanFitness
   });
+  if (generationViewer) {
+    const viewerEntry = buildGenerationViewerEntry(entry, absoluteGeneration);
+    if (viewerEntry) {
+      generationViewer.addGeneration(viewerEntry);
+    }
+  }
 }
 
 function persistSnapshot(snapshot) {
@@ -111,6 +164,7 @@ function handleRunComplete(result) {
   saveRunState(state);
   persistedRunState = state;
   updateStatus('Evolution run complete. Results saved locally.');
+  generationViewer?.jumpToLatest({ silent: true });
 }
 
 function getReplayBuffer(record) {
@@ -142,6 +196,7 @@ function storeReplay(buffer, metadata) {
 
 function applySavedRunStateToUi(state) {
   if (!state) {
+    generationViewer?.reset();
     return;
   }
   if (state.config) {
@@ -157,8 +212,16 @@ function applySavedRunStateToUi(state) {
       bestFitness: last?.bestFitness,
       meanFitness: last?.meanFitness
     });
+    if (generationViewer) {
+      const entries = state.history
+        .map((entry) => buildGenerationViewerEntry(entry, entry?.generation ?? 0))
+        .filter(Boolean);
+      generationViewer.setEntries(entries);
+      generationViewer.jumpToLatest({ silent: true });
+    }
   } else {
     evolutionPanel.resetStats();
+    generationViewer?.reset();
   }
 }
 
@@ -171,6 +234,9 @@ async function executeEvolutionRun({ config, resumeState = null, resetStats = tr
   if (!resumeState) {
     clearRunState();
     persistedRunState = null;
+    generationViewer?.reset();
+  } else {
+    generationViewer?.jumpToLatest({ silent: true });
   }
   if (resetStats) {
     evolutionPanel.resetStats();
@@ -181,6 +247,7 @@ async function executeEvolutionRun({ config, resumeState = null, resetStats = tr
     total: activeRunTotalGenerations
   });
   evolutionPanel.setRunning(true);
+  generationViewer?.setRunning(true);
   updateStatus('Evolution run in progress…');
   const controller = new AbortController();
   evolutionAbortController = controller;
@@ -223,6 +290,8 @@ async function executeEvolutionRun({ config, resumeState = null, resetStats = tr
     }
   } finally {
     evolutionPanel.setRunning(false);
+    generationViewer?.setRunning(false);
+    generationViewer?.stopPlayback();
     evolutionAbortController = null;
     activeRunConfig = null;
     activeRunTotalGenerations = 0;
@@ -245,6 +314,22 @@ const evolutionPanel = createEvolutionPanel({
     mean: statMean
   }
 });
+if (
+  generationViewerContainer &&
+  generationSlider &&
+  generationPlayButton &&
+  generationLatestButton &&
+  generationTimeline
+) {
+  generationViewer = createGenerationViewer({
+    container: generationViewerContainer,
+    slider: generationSlider,
+    playButton: generationPlayButton,
+    latestButton: generationLatestButton,
+    summary: generationSummaryNodes,
+    timeline: generationTimeline
+  });
+}
 
 if (persistedRunState) {
   applySavedRunStateToUi(persistedRunState);
@@ -438,6 +523,7 @@ const neuromorphsApi = {
       persistedRunState = null;
       evolutionPanel.resetStats();
       evolutionPanel.updateProgress({ generation: 0, total: 1 });
+      generationViewer?.reset();
       updateStatus('Cleared stored evolution run.');
     }
   }

@@ -146,17 +146,20 @@ export async function runEvolution({
       }
 
       evaluated.sort((a, b) => (b.fitness ?? 0) - (a.fitness ?? 0));
-      const bestFitness = evaluated[0]?.fitness ?? 0;
+      const bestEvaluation = evaluated[0] ?? null;
+      const bestFitness = bestEvaluation?.fitness ?? 0;
       const meanFitness =
         evaluated.reduce((total, entry) => total + (entry.fitness ?? 0), 0) /
         Math.max(1, evaluated.length);
-      const bestIndividual = evaluated[0] ? stripEvaluation(evaluated[0]) : null;
+      const bestIndividual = bestEvaluation ? stripEvaluation(bestEvaluation) : null;
+      const bestMetrics = bestEvaluation?.metrics ? clone(bestEvaluation.metrics) : null;
 
       const generationSummary = {
         generation,
         bestFitness,
         meanFitness,
-        bestIndividual
+        bestIndividual,
+        bestMetrics
       };
       history.push(clone(generationSummary));
 
@@ -167,6 +170,7 @@ export async function runEvolution({
           bestFitness,
           meanFitness,
           bestIndividual,
+          bestMetrics,
           evaluated: evaluated.map((entry) => ({
             id: entry.id,
             fitness: entry.fitness,
