@@ -14,11 +14,19 @@ import {
   createReplayPlayback
 } from './replayRecorder.js';
 
+function createInteractionGroup(membership, filter) {
+  const membershipMask = membership & 0xffff;
+  const filterMask = filter & 0xffff;
+  return (membershipMask << 16) | filterMask;
+}
+
 const META_LENGTH = 2;
 const META_VERSION_INDEX = 0;
 const META_WRITE_LOCK_INDEX = 1;
 const FLOATS_PER_BODY = 7;
 const MAX_JOINT_ANGULAR_DELTA = 15; // rad/s per simulation step
+const COLLISION_GROUP_CREATURE = createInteractionGroup(0b0001, 0xfffe);
+const COLLISION_GROUP_ENVIRONMENT = createInteractionGroup(0b0010, 0xffff);
 
 let world = null;
 let running = false;
@@ -366,7 +374,8 @@ function instantiateCreature(morphGenome, controllerGenome) {
     )
       .setDensity(descriptor.density ?? 1)
       .setFriction(descriptor.material?.friction ?? 0.9)
-      .setRestitution(descriptor.material?.restitution ?? 0.2);
+      .setRestitution(descriptor.material?.restitution ?? 0.2)
+      .setCollisionGroups(COLLISION_GROUP_CREATURE);
     const collider = world.createCollider(colliderDesc, rigidBody);
 
     creatureBodies.set(descriptor.id, {
@@ -422,6 +431,9 @@ function instantiateCreature(morphGenome, controllerGenome) {
       childEntry.body,
       true
     );
+    if (typeof jointHandle?.setContactsEnabled === 'function') {
+      jointHandle.setContactsEnabled(false);
+    }
     if (jointDef.limits) {
       try {
         jointHandle.setLimits(jointDef.limits[0], jointDef.limits[1]);
@@ -634,7 +646,9 @@ async function initializeWorld() {
     world = new RAPIER.World(gravity);
     world.timestep = 1 / 60;
 
-    const floorCollider = RAPIER.ColliderDesc.cuboid(7, 0.1, 6).setTranslation(0, -0.6, 0);
+    const floorCollider = RAPIER.ColliderDesc.cuboid(7, 0.1, 6)
+      .setTranslation(0, -0.6, 0)
+      .setCollisionGroups(COLLISION_GROUP_ENVIRONMENT);
     world.createCollider(floorCollider);
 
     const defaultMorph = createDefaultMorphGenome();
