@@ -8,6 +8,11 @@ import {
   createDefaultControllerGenome
 } from '../genomes/ctrlGenome.js';
 import { createControllerRuntime } from './controllerRuntime.js';
+import {
+  createReplayRecorder,
+  decodeReplayBuffer,
+  createReplayPlayback
+} from './replayRecorder.js';
 
 const META_LENGTH = 2;
 const META_VERSION_INDEX = 0;
@@ -33,6 +38,8 @@ let bodyDescriptorsCache = [];
 let creatureJointDescriptors = [];
 let creatureJointMap = new Map();
 let controllerRuntime = null;
+let replayRecorder = createReplayRecorder();
+let activeReplay = null;
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -102,6 +109,78 @@ function clearCreature() {
   creatureJointDescriptors = [];
   creatureJointMap.clear();
   controllerRuntime = null;
+  replayRecorder.clear();
+}
+
+function isReplayActive() {
+  return Boolean(activeReplay);
+}
+
+function startReplayRecording() {
+  if (isReplayActive()) {
+    return;
+  }
+  if (!world) {
+    return;
+  }
+  replayRecorder.start({
+    jointDescriptors: creatureJointDescriptors,
+    actuatorIds: controllerRuntime?.actuators ?? [],
+    timestep: world.timestep ?? 1 / 60
+  });
+}
+
+function stopReplayRecording() {
+  if (isReplayActive()) {
+    return;
+  }
+  if (!replayRecorder.isRecording()) {
+    return;
+  }
+  const metadata = replayRecorder.getMetadata();
+  const buffer = replayRecorder.stop();
+  if (buffer) {
+    postMessage(
+      {
+        type: 'replay-recorded',
+        buffer,
+        metadata
+      },
+      [buffer]
+    );
+  }
+}
+
+function stopReplayPlayback({ notify = true } = {}) {
+  if (!isReplayActive()) {
+    return;
+  }
+  activeReplay = null;
+  if (notify) {
+    postMessage({ type: 'replay-stopped' });
+  }
+}
+
+function startReplayPlayback(buffer) {
+  if (!(buffer instanceof ArrayBuffer)) {
+    postMessage({ type: 'replay-error', message: 'Replay buffer missing or invalid.' });
+    return false;
+  }
+  const decoded = decodeReplayBuffer(buffer);
+  if (!decoded || !Array.isArray(decoded.frames) || decoded.frames.length === 0) {
+    postMessage({ type: 'replay-error', message: 'Replay data could not be decoded.' });
+    return false;
+  }
+  resetCreature();
+  activeReplay = createReplayPlayback(decoded);
+  if (!activeReplay || activeReplay.getFrameCount() === 0) {
+    activeReplay = null;
+    postMessage({ type: 'replay-error', message: 'Replay contains no frames.' });
+    return false;
+  }
+  postMessage({ type: 'replay-started', metadata: activeReplay.getMetadata?.() ?? null });
+  setRunning(true);
+  return true;
 }
 
 function configureSharedState(bodyDescriptors, materials) {
@@ -591,12 +670,18 @@ function setRunning(next) {
   }
   running = next;
   if (running) {
+    if (!isReplayActive()) {
+      startReplayRecording();
+    }
     if (stepHandle === null) {
       stepHandle = setInterval(stepSimulation, 16);
     }
   } else if (stepHandle !== null) {
     clearInterval(stepHandle);
     stepHandle = null;
+    if (!isReplayActive()) {
+      stopReplayRecording();
+    }
   }
   postMessage({ type: 'state', running });
 }
@@ -609,9 +694,31 @@ function stepSimulation() {
   const dt = world.timestep ?? 1 / 60;
   const sensors = gatherSensorSnapshot();
   let controllerResult = null;
-  if (controllerRuntime) {
+  let commands = [];
+  if (isReplayActive()) {
+    const frame = activeReplay.next();
+    if (!frame) {
+      stopReplayPlayback({ notify: false });
+      setRunning(false);
+      postMessage({ type: 'replay-complete' });
+      return;
+    }
+    commands = frame.commands.map((command) => ({
+      id: command.actuatorId ?? undefined,
+      target: { type: 'joint', id: command.targetId },
+      value: command.value
+    }));
+  } else if (controllerRuntime) {
     controllerResult = controllerRuntime.update(dt, sensors);
-    applyControllerCommands(controllerResult);
+    commands = Array.isArray(controllerResult?.commands) ? controllerResult.commands : [];
+  }
+
+  if (commands.length > 0) {
+    applyControllerCommands({ commands });
+  }
+
+  if (!isReplayActive() && replayRecorder.isRecording()) {
+    replayRecorder.record({ dt, commands });
   }
 
   world.step();
@@ -636,6 +743,14 @@ function stepSimulation() {
     payload.controller = controllerResult.nodeOutputs;
   }
 
+  if (commands.length > 0) {
+    payload.commands = commands.map((command) => ({
+      id: command.id ?? null,
+      target: command.target,
+      value: command.value
+    }));
+  }
+
   postMessage(payload);
 
   const rootId = bodyOrder[0];
@@ -643,7 +758,7 @@ function stepSimulation() {
     const rootEntry = creatureBodies.get(rootId);
     if (rootEntry) {
       const translation = rootEntry.body.translation();
-      if (translation.y < -10) {
+      if (!isReplayActive() && translation.y < -10) {
         resetCreature();
       }
     }
@@ -660,6 +775,18 @@ self.addEventListener('message', (event) => {
   } else if (data.type === 'pause') {
     setRunning(false);
   } else if (data.type === 'reset') {
+    stopReplayPlayback({ notify: false });
+    resetCreature();
+  } else if (data.type === 'play-replay') {
+    const buffer = data.buffer instanceof ArrayBuffer ? data.buffer : null;
+    if (!buffer) {
+      postMessage({ type: 'replay-error', message: 'Replay buffer missing.' });
+      return;
+    }
+    startReplayPlayback(buffer);
+  } else if (data.type === 'stop-replay') {
+    stopReplayPlayback();
+    setRunning(false);
     resetCreature();
   }
 });

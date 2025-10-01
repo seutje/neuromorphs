@@ -5,6 +5,10 @@ import { mutateMorphGenome, mutateControllerGenome } from './mutation.js';
 import { computeLocomotionFitness } from './fitness.js';
 import { runEvolution } from './evolutionEngine.js';
 
+function cloneValue(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
 function buildInitialPopulation({
   populationSize,
   baseMorph,
@@ -65,6 +69,8 @@ export async function runEvolutionDemo(options = {}) {
     signal,
     onGeneration,
     onComplete,
+    onStateSnapshot,
+    resume,
     logger = console
   } = options;
 
@@ -73,20 +79,59 @@ export async function runEvolutionDemo(options = {}) {
     controller: overrideMutationConfig?.controller ?? controllerMutation ?? {}
   };
 
-  const rng = createRng(seed);
+  const resumeState = resume ?? options.resumeState ?? null;
+  const resumeGeneration = Math.max(0, Math.floor(resumeState?.generation ?? 0));
+  const resumeHistory = Array.isArray(resumeState?.history) ? resumeState.history : [];
+  const totalGenerations = Math.max(0, generations);
+  const remainingGenerations = Math.max(0, totalGenerations - resumeGeneration);
+
+  const rng = createRng(resumeState?.rngState ?? seed);
   const baseMorph = options.baseMorph ?? createDefaultMorphGenome();
   const baseController = options.baseController ?? createDefaultControllerGenome();
-  const initialPopulation = buildInitialPopulation({
-    populationSize,
-    baseMorph,
-    baseController,
-    rng,
-    mutationConfig
-  });
+
+  const initialPopulation = Array.isArray(resumeState?.population) && resumeState.population.length
+    ? resumeState.population.map((individual) => cloneValue(individual))
+    : buildInitialPopulation({
+        populationSize,
+        baseMorph,
+        baseController,
+        rng,
+        mutationConfig
+      });
+
+  if (resumeGeneration > 0 && Array.isArray(resumeHistory) && typeof onGeneration === 'function') {
+    resumeHistory.forEach((entry, index) => {
+      if (!entry) {
+        return;
+      }
+      onGeneration({
+        generation: index,
+        absoluteGeneration: entry.generation ?? index,
+        bestFitness: entry.bestFitness,
+        meanFitness: entry.meanFitness,
+        bestIndividual: entry.bestIndividual,
+        replayed: true,
+        evaluated: entry.evaluated ?? []
+      });
+    });
+  }
+
+  if (remainingGenerations === 0) {
+    const result = {
+      history: resumeHistory,
+      population: initialPopulation,
+      best: resumeHistory[resumeHistory.length - 1]?.bestIndividual ?? null,
+      rngState: typeof rng.serialize === 'function' ? rng.serialize() : null
+    };
+    if (typeof onComplete === 'function') {
+      onComplete(result);
+    }
+    return result;
+  }
 
   const result = await runEvolution({
     initialPopulation,
-    generations,
+    generations: remainingGenerations,
     elitism,
     tournamentSize,
     rng,
@@ -94,6 +139,9 @@ export async function runEvolutionDemo(options = {}) {
     signal,
     logger,
     onGeneration,
+    onStateSnapshot,
+    startGeneration: resumeGeneration,
+    history: resumeHistory,
     evaluate: async (individual, context) => {
       const evalTrace = createSyntheticTrace(individual, context.rng);
       const metrics = computeLocomotionFitness(evalTrace);

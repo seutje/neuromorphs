@@ -66,7 +66,10 @@ export async function runEvolution({
   mutationConfig = {},
   logger,
   signal,
-  onGeneration
+  onGeneration,
+  onStateSnapshot,
+  startGeneration = 0,
+  history: initialHistory = []
 }) {
   if (!Array.isArray(initialPopulation) || initialPopulation.length === 0) {
     throw new Error('initialPopulation must contain at least one individual.');
@@ -103,11 +106,25 @@ export async function runEvolution({
       ...clone(individual),
       id: individual.id ?? `ind-${index}`
     }));
-    const history = [];
+    const history = Array.isArray(initialHistory)
+      ? initialHistory.map((entry) => clone(entry))
+      : [];
     const globalRng = rng;
+    const baseGeneration = Math.max(0, Math.floor(startGeneration));
+    const steps = Math.max(0, Math.floor(generations));
 
-    for (let generation = 0; generation < generations; generation += 1) {
+    if (typeof onStateSnapshot === 'function') {
+      onStateSnapshot({
+        generation: baseGeneration,
+        population: population.map((individual) => stripEvaluation(individual)),
+        rngState: typeof globalRng?.serialize === 'function' ? globalRng.serialize() : null,
+        history: history.map((entry) => clone(entry))
+      });
+    }
+
+    for (let step = 0; step < steps; step += 1) {
       throwIfAborted();
+      const generation = baseGeneration + step;
       const evaluated = [];
       for (let index = 0; index < population.length; index += 1) {
         throwIfAborted();
@@ -141,11 +158,15 @@ export async function runEvolution({
         meanFitness,
         bestIndividual
       };
-      history.push(generationSummary);
+      history.push(clone(generationSummary));
 
       if (typeof onGeneration === 'function') {
         onGeneration({
-          ...generationSummary,
+          generation: step,
+          absoluteGeneration: generation,
+          bestFitness,
+          meanFitness,
+          bestIndividual,
           evaluated: evaluated.map((entry) => ({
             id: entry.id,
             fitness: entry.fitness,
@@ -177,15 +198,25 @@ export async function runEvolution({
         nextPopulation.push(child);
       }
 
+      if (typeof onStateSnapshot === 'function') {
+        onStateSnapshot({
+          generation: generation + 1,
+          population: nextPopulation.map((individual) => stripEvaluation(individual)),
+          rngState: typeof globalRng?.serialize === 'function' ? globalRng.serialize() : null,
+          history: history.map((entry) => clone(entry))
+        });
+      }
+
       population = nextPopulation;
     }
 
     const finalBest = history[history.length - 1]?.bestIndividual ?? null;
 
     return {
-      history,
-      population,
-      best: finalBest
+      history: history.map((entry) => clone(entry)),
+      population: population.map((individual) => stripEvaluation(individual)),
+      best: finalBest,
+      rngState: typeof rng?.serialize === 'function' ? rng.serialize() : null
     };
   } finally {
     if (signal && abortListener) {

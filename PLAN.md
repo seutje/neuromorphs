@@ -148,17 +148,19 @@
 ---
 
 ## Phase 6 — Replays & Persistence (Local Only)
-- [ ] **P6-01: Replay Recorder**
+- [x] **P6-01: Replay Recorder**
   - **Owner:** Orchestration Agent
   - **Inputs:** Control outputs
   - **Outputs:** ArrayBuffer of replay frames
   - **DoD:** Playback matches original run
   - **Dependencies:** P3-03
-- [ ] **P6-02: Local Storage for Runs**
+  - **Status:** Worker records controller commands each tick, emits serialized replay buffers, and supports deterministic playback on demand.
+- [x] **P6-02: Local Storage for Runs**
   - **Owner:** Platform Agent
   - **Outputs:** Save/load JSON of genomes + fitness
   - **DoD:** Reload page → run resumes
   - **Dependencies:** P4-01, P6-01
+  - **Status:** Evolution snapshots persist to localStorage, auto-resume restores config/history, and latest replays are retained with browser-side playback helpers.
 
 ---
 

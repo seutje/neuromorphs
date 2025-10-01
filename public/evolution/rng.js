@@ -14,22 +14,31 @@ function toSeedNumber(seed) {
   return hash >>> 0;
 }
 
-function mulberry32(seed) {
-  let state = seed >>> 0;
-  return () => {
+function resolveSeedInput(seedOrState) {
+  if (typeof seedOrState === 'object' && seedOrState !== null) {
+    if (Number.isFinite(seedOrState.state)) {
+      return seedOrState.state;
+    }
+    if (Number.isFinite(seedOrState.seed)) {
+      return seedOrState.seed;
+    }
+  }
+  return seedOrState;
+}
+
+export function createRng(seedInput = 1) {
+  const initialSeed = resolveSeedInput(seedInput);
+  let state = toSeedNumber(initialSeed) || 1;
+  if (state === 0) {
+    state = 1;
+  }
+
+  function next() {
     state += 0x6d2b79f5;
     let t = state;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-export function createRng(seed = 1) {
-  const generator = mulberry32(toSeedNumber(seed) || 1);
-
-  function next() {
-    return generator();
   }
 
   function float(min = 0, max = 1) {
@@ -72,7 +81,10 @@ export function createRng(seed = 1) {
     int,
     choice,
     sign,
-    bool
+    bool,
+    serialize() {
+      return { state };
+    }
   };
 }
 

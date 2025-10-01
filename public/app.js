@@ -2,6 +2,14 @@ import { createViewer } from './render/viewer.js';
 import { createViewControls } from './ui/viewControls.js';
 import { createEvolutionPanel } from './ui/evolutionPanel.js';
 import { runEvolutionDemo } from './evolution/demo.js';
+import {
+  saveRunState,
+  loadRunState,
+  clearRunState,
+  saveReplayRecord,
+  loadReplayRecord,
+  clearReplayRecord
+} from './persistence/runStorage.js';
 
 const canvas = document.querySelector('#viewport');
 const statusMessage = document.querySelector('#status-message');
@@ -13,6 +21,213 @@ const evolutionProgress = document.querySelector('#evolution-progress');
 const statGeneration = document.querySelector('#stat-generation');
 const statBest = document.querySelector('#stat-best');
 const statMean = document.querySelector('#stat-mean');
+
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
+
+function deepClone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+let persistedRunState = loadRunState() ?? null;
+let latestReplay = loadReplayRecord() ?? null;
+let activeRunConfig = null;
+let activeRunTotalGenerations = 0;
+
+function applyConfigToForm(config) {
+  if (!config || !evolutionForm) {
+    return;
+  }
+  const assign = (name, value) => {
+    if (evolutionForm[name]) {
+      evolutionForm[name].value = String(value ?? '');
+    }
+  };
+  assign('seed', config.seed ?? 42);
+  assign('populationSize', config.populationSize ?? 12);
+  assign('generations', config.generations ?? 10);
+  assign('morphAddLimbChance', config.morphMutation?.addLimbChance ?? 0.35);
+  assign('morphResizeChance', config.morphMutation?.resizeChance ?? 0.85);
+  assign('morphJointJitterChance', config.morphMutation?.jointJitterChance ?? 0.65);
+  assign('controllerWeightChance', config.controllerMutation?.weightJitterChance ?? 0.85);
+  assign('controllerOscillatorChance', config.controllerMutation?.oscillatorChance ?? 0.6);
+  assign('controllerAddConnectionChance', config.controllerMutation?.addConnectionChance ?? 0.45);
+}
+
+function handleGenerationUpdate(entry) {
+  if (!entry) {
+    return;
+  }
+  const total = activeRunTotalGenerations || activeRunConfig?.generations || 1;
+  const absoluteGeneration = Number.isFinite(entry.absoluteGeneration)
+    ? entry.absoluteGeneration
+    : Number(entry.generation ?? 0);
+  evolutionPanel.updateProgress({
+    generation: Math.min(total, absoluteGeneration + 1),
+    total
+  });
+  evolutionPanel.updateStats({
+    generation: absoluteGeneration + 1,
+    bestFitness: entry.bestFitness,
+    meanFitness: entry.meanFitness
+  });
+}
+
+function persistSnapshot(snapshot) {
+  if (!snapshot || !activeRunConfig) {
+    return;
+  }
+  const total = activeRunTotalGenerations || activeRunConfig.generations || 0;
+  const state = {
+    status: snapshot.generation >= total ? 'completed' : 'running',
+    config: deepClone(activeRunConfig),
+    generation: snapshot.generation,
+    totalGenerations: total,
+    history: snapshot.history ?? [],
+    population: snapshot.population ?? [],
+    rngState: snapshot.rngState ?? null,
+    updatedAt: Date.now()
+  };
+  saveRunState(state);
+  persistedRunState = state;
+}
+
+function handleRunComplete(result) {
+  if (!activeRunConfig || !result) {
+    return;
+  }
+  const total = activeRunTotalGenerations || activeRunConfig.generations || 0;
+  const state = {
+    status: 'completed',
+    config: deepClone(activeRunConfig),
+    generation: total,
+    totalGenerations: total,
+    history: result.history ?? [],
+    population: result.population ?? [],
+    rngState: result.rngState ?? null,
+    best: result.best ?? null,
+    updatedAt: Date.now()
+  };
+  saveRunState(state);
+  persistedRunState = state;
+  updateStatus('Evolution run complete. Results saved locally.');
+}
+
+function getReplayBuffer(record) {
+  if (!record || typeof record.json !== 'string') {
+    return null;
+  }
+  return textEncoder.encode(record.json).buffer;
+}
+
+function storeReplay(buffer, metadata) {
+  if (!(buffer instanceof ArrayBuffer)) {
+    return;
+  }
+  try {
+    const json = textDecoder.decode(buffer);
+    latestReplay = {
+      json,
+      metadata: metadata ?? null,
+      updatedAt: Date.now()
+    };
+    saveReplayRecord({ json, metadata });
+    updateStatus(
+      'Replay captured. Call window.Neuromorphs.replays.playLatest() to watch the playback.'
+    );
+  } catch (error) {
+    console.warn('Failed to store replay:', error);
+  }
+}
+
+function applySavedRunStateToUi(state) {
+  if (!state) {
+    return;
+  }
+  if (state.config) {
+    applyConfigToForm(state.config);
+  }
+  const total = state.totalGenerations ?? state.config?.generations ?? 0;
+  const generation = state.generation ?? 0;
+  evolutionPanel.updateProgress({ generation, total });
+  if (Array.isArray(state.history) && state.history.length > 0) {
+    const last = state.history[state.history.length - 1];
+    evolutionPanel.updateStats({
+      generation: (last?.generation ?? generation) + 1,
+      bestFitness: last?.bestFitness,
+      meanFitness: last?.meanFitness
+    });
+  } else {
+    evolutionPanel.resetStats();
+  }
+}
+
+async function executeEvolutionRun({ config, resumeState = null, resetStats = true } = {}) {
+  if (!config || evolutionAbortController) {
+    return;
+  }
+  activeRunConfig = deepClone(config);
+  activeRunTotalGenerations = config.generations;
+  if (!resumeState) {
+    clearRunState();
+    persistedRunState = null;
+  }
+  if (resetStats) {
+    evolutionPanel.resetStats();
+  }
+  const startingGeneration = resumeState?.generation ?? 0;
+  evolutionPanel.updateProgress({
+    generation: startingGeneration,
+    total: activeRunTotalGenerations
+  });
+  evolutionPanel.setRunning(true);
+  updateStatus('Evolution run in progress…');
+  const controller = new AbortController();
+  evolutionAbortController = controller;
+  try {
+    await runEvolutionDemo({
+      seed: config.seed,
+      generations: config.generations,
+      populationSize: config.populationSize,
+      mutationConfig: {
+        morph: config.morphMutation,
+        controller: config.controllerMutation
+      },
+      resume: resumeState,
+      signal: controller.signal,
+      onGeneration: (entry) => {
+        handleGenerationUpdate(entry);
+      },
+      onStateSnapshot: (snapshot) => {
+        persistSnapshot(snapshot);
+      },
+      onComplete: (result) => {
+        handleRunComplete(result);
+      }
+    });
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      console.info('Evolution run aborted by user.');
+      if (persistedRunState) {
+        const abortedState = {
+          ...persistedRunState,
+          status: 'aborted',
+          updatedAt: Date.now()
+        };
+        saveRunState(abortedState);
+        persistedRunState = abortedState;
+      }
+    } else {
+      console.warn('Evolution run failed:', error);
+      updateStatus('Evolution run failed — check the console for details.');
+    }
+  } finally {
+    evolutionPanel.setRunning(false);
+    evolutionAbortController = null;
+    activeRunConfig = null;
+    activeRunTotalGenerations = 0;
+  }
+}
 
 if (!canvas) {
   throw new Error('Viewport canvas not found.');
@@ -30,6 +245,31 @@ const evolutionPanel = createEvolutionPanel({
     mean: statMean
   }
 });
+
+if (persistedRunState) {
+  applySavedRunStateToUi(persistedRunState);
+  const resumeTotal =
+    persistedRunState.totalGenerations ?? persistedRunState.config?.generations ?? 0;
+  if (
+    persistedRunState.status === 'running' &&
+    persistedRunState.config &&
+    (persistedRunState.generation ?? 0) < resumeTotal
+  ) {
+    const resumeState = {
+      generation: persistedRunState.generation ?? 0,
+      history: persistedRunState.history ?? [],
+      population: persistedRunState.population ?? [],
+      rngState: persistedRunState.rngState ?? null
+    };
+    executeEvolutionRun({
+      config: persistedRunState.config,
+      resumeState,
+      resetStats: false
+    });
+  } else if (persistedRunState.status === 'completed') {
+    updateStatus('Loaded previous evolution run from storage.');
+  }
+}
 
 viewControls.setViewMode(viewControls.getViewMode());
 viewControls.onViewModeChange((mode) => viewer.setViewMode(mode));
@@ -131,6 +371,19 @@ physicsWorker.addEventListener('message', (event) => {
         sensorLogTimestamp = data.timestamp;
       }
     }
+  } else if (data.type === 'replay-recorded') {
+    if (data.buffer instanceof ArrayBuffer) {
+      storeReplay(data.buffer, data.metadata ?? null);
+    }
+  } else if (data.type === 'replay-started') {
+    updateStatus('Playing recorded replay…');
+  } else if (data.type === 'replay-complete') {
+    updateStatus('Replay playback finished.');
+  } else if (data.type === 'replay-stopped') {
+    updateStatus('Replay playback stopped.');
+  } else if (data.type === 'replay-error') {
+    console.warn('Replay error:', data.message);
+    updateStatus('Replay failed — see console for details.');
   } else if (data.type === 'error') {
     console.error('Physics worker failed to initialize:', data.message);
     updateStatus('Physics worker failed to start. Check the console for details.');
@@ -140,47 +393,8 @@ physicsWorker.addEventListener('message', (event) => {
   }
 });
 
-evolutionPanel.onStart(async (config) => {
-  if (evolutionAbortController) {
-    return;
-  }
-  evolutionPanel.resetStats();
-  evolutionPanel.updateProgress({ generation: 0, total: config.generations });
-  evolutionPanel.setRunning(true);
-  const controller = new AbortController();
-  evolutionAbortController = controller;
-  try {
-    await runEvolutionDemo({
-      seed: config.seed,
-      generations: config.generations,
-      populationSize: config.populationSize,
-      mutationConfig: {
-        morph: config.morphMutation,
-        controller: config.controllerMutation
-      },
-      signal: controller.signal,
-      onGeneration: (entry) => {
-        evolutionPanel.updateProgress({
-          generation: entry.generation + 1,
-          total: config.generations
-        });
-        evolutionPanel.updateStats({
-          generation: entry.generation + 1,
-          bestFitness: entry.bestFitness,
-          meanFitness: entry.meanFitness
-        });
-      }
-    });
-  } catch (error) {
-    if (error?.name === 'AbortError') {
-      console.info('Evolution run aborted by user.');
-    } else {
-      console.warn('Evolution run failed:', error);
-    }
-  } finally {
-    evolutionPanel.setRunning(false);
-    evolutionAbortController = null;
-  }
+evolutionPanel.onStart((config) => {
+  executeEvolutionRun({ config, resetStats: true });
 });
 
 evolutionPanel.onStop(() => {
@@ -188,3 +402,50 @@ evolutionPanel.onStop(() => {
     evolutionAbortController.abort();
   }
 });
+
+const neuromorphsApi = {
+  replays: {
+    hasReplay() {
+      return Boolean(latestReplay);
+    },
+    getMetadata() {
+      return latestReplay?.metadata ?? null;
+    },
+    playLatest() {
+      if (!latestReplay) {
+        console.warn('No replay available yet.');
+        return;
+      }
+      const buffer = getReplayBuffer(latestReplay);
+      if (!buffer) {
+        console.warn('Replay data is unavailable.');
+        return;
+      }
+      physicsWorker.postMessage({ type: 'play-replay', buffer }, [buffer]);
+    },
+    clear() {
+      latestReplay = null;
+      clearReplayRecord();
+      updateStatus('Cleared stored replay data.');
+    }
+  },
+  runs: {
+    getState() {
+      return persistedRunState ? deepClone(persistedRunState) : null;
+    },
+    clear() {
+      clearRunState();
+      persistedRunState = null;
+      evolutionPanel.resetStats();
+      evolutionPanel.updateProgress({ generation: 0, total: 1 });
+      updateStatus('Cleared stored evolution run.');
+    }
+  }
+};
+
+if (typeof window !== 'undefined') {
+  const target = window.Neuromorphs ? { ...window.Neuromorphs } : {};
+  target.replays = neuromorphsApi.replays;
+  target.runs = neuromorphsApi.runs;
+  window.Neuromorphs = target;
+}
