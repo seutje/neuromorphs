@@ -4,35 +4,53 @@ import { mutateMorphGenome, mutateControllerGenome } from '../public/evolution/m
 import { createRng } from '../public/evolution/rng.js';
 import { computeLocomotionFitness } from '../public/evolution/fitness.js';
 import { runEvolution } from '../public/evolution/evolutionEngine.js';
-import { createSyntheticTrace } from '../public/evolution/demo.js';
+import { simulateLocomotion } from '../public/evolution/simulator.js';
 
-describe('createSyntheticTrace', () => {
-  it('caps extreme oscillator parameters to plausible displacement', () => {
-    const individual = {
-      morph: { bodies: Array.from({ length: 10 }, () => ({})) },
-      controller: {
-        nodes: [
-          { type: 'oscillator', amplitude: 50, frequency: 40 },
-          { type: 'bias' }
-        ]
-      }
-    };
-    const rng = createRng(7);
-    const steps = 60;
+describe('simulateLocomotion', () => {
+  jest.setTimeout(20000);
 
-    const trace = createSyntheticTrace(individual, rng, steps);
+  it('produces a physics-derived trace with runtime matching the requested duration', async () => {
+    const morph = createDefaultMorphGenome();
+    const controller = createDefaultControllerGenome();
 
-    expect(trace).toHaveLength(steps + 1);
-    const finalSample = trace[trace.length - 1];
-    expect(finalSample.timestamp).toBeCloseTo(1, 5);
-    expect(finalSample.centerOfMass.x).toBeLessThanOrEqual(2.65);
-
-    const segmentSpeeds = trace.slice(1).map((sample, index) => {
-      const prev = trace[index];
-      const deltaTime = sample.timestamp - prev.timestamp;
-      return deltaTime > 0 ? (sample.centerOfMass.x - prev.centerOfMass.x) / deltaTime : 0;
+    const result = await simulateLocomotion({
+      morphGenome: morph,
+      controllerGenome: controller,
+      duration: 1.2,
+      sampleInterval: 1 / 20
     });
-    expect(Math.max(...segmentSpeeds)).toBeLessThanOrEqual(2.63);
+
+    expect(result.trace.length).toBeGreaterThan(2);
+    expect(result.trace[0].timestamp).toBeCloseTo(0, 5);
+    const finalSample = result.trace[result.trace.length - 1];
+    expect(finalSample.timestamp).toBeGreaterThan(0);
+    expect(result.runtime).toBeCloseTo(finalSample.timestamp, 2);
+    expect(Number.isFinite(finalSample.centerOfMass.x)).toBe(true);
+    expect(Number.isFinite(finalSample.rootHeight ?? 0)).toBe(true);
+  });
+
+  it('reflects shorter simulations with fewer samples and reduced runtime', async () => {
+    const morph = createDefaultMorphGenome();
+    const controller = createDefaultControllerGenome();
+
+    const longRun = await simulateLocomotion({
+      morphGenome: morph,
+      controllerGenome: controller,
+      duration: 1.5,
+      sampleInterval: 1 / 30
+    });
+    const shortRun = await simulateLocomotion({
+      morphGenome: morph,
+      controllerGenome: controller,
+      duration: 0.6,
+      sampleInterval: 1 / 30
+    });
+
+    expect(shortRun.trace.length).toBeLessThan(longRun.trace.length);
+    expect(shortRun.runtime).toBeLessThan(longRun.runtime);
+    expect(shortRun.trace[shortRun.trace.length - 1].timestamp).toBeLessThan(
+      longRun.trace[longRun.trace.length - 1].timestamp
+    );
   });
 });
 

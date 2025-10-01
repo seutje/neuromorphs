@@ -4,13 +4,10 @@ import { createRng, splitRng } from './rng.js';
 import { mutateMorphGenome, mutateControllerGenome } from './mutation.js';
 import { computeLocomotionFitness } from './fitness.js';
 import { runEvolution } from './evolutionEngine.js';
+import { simulateLocomotion } from './simulator.js';
 
 function cloneValue(value) {
   return JSON.parse(JSON.stringify(value));
-}
-
-function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
 }
 
 function buildInitialPopulation({
@@ -39,38 +36,6 @@ function buildInitialPopulation({
   });
 }
 
-export function createSyntheticTrace(individual, rng, steps = 30) {
-  const oscillator = individual.controller.nodes.find((node) => node.type === 'oscillator');
-  const amplitude = clamp(Math.abs(oscillator?.amplitude ?? 0.7), 0.1, 1.5);
-  const frequency = clamp(Math.abs(oscillator?.frequency ?? 1.2), 0.1, 2.5);
-
-  const limbCount = Math.max(1, individual.morph.bodies.length - 1);
-  const effectiveLimbs = clamp(limbCount, 1, 6);
-
-  const stepDuration = 1 / Math.max(1, steps);
-  const strideLength = 0.18 + amplitude * 0.22 + (effectiveLimbs - 1) * 0.03;
-  const baseSpeed = strideLength * frequency;
-  const maxSpeed = 2.6; // meters per second observed from recorded physics runs
-  const strideGain = Math.min(baseSpeed, maxSpeed) * stepDuration;
-
-  let displacement = 0;
-  const samples = [];
-  for (let step = 0; step <= steps; step += 1) {
-    const t = step * stepDuration;
-    const noise = rng.range(-0.015, 0.015) * stepDuration;
-    displacement += strideGain + noise;
-    const heightBase = 0.7 + amplitude * 0.1;
-    const rootHeightOscillation = Math.abs(Math.sin(t * Math.PI * frequency)) * 0.12;
-    const rootHeight = Math.max(0.25, heightBase - rootHeightOscillation);
-    samples.push({
-      timestamp: t,
-      centerOfMass: { x: displacement, y: heightBase, z: 0 },
-      rootHeight
-    });
-  }
-  return samples;
-}
-
 export async function runEvolutionDemo(options = {}) {
   const {
     seed = 42,
@@ -86,7 +51,10 @@ export async function runEvolutionDemo(options = {}) {
     onComplete,
     onStateSnapshot,
     resume,
-    logger = console
+    logger = console,
+    simulationDuration = 2.5,
+    simulationTimestep = 1 / 60,
+    simulationSampleInterval = 1 / 30
   } = options;
 
   const mutationConfig = {
@@ -157,12 +125,23 @@ export async function runEvolutionDemo(options = {}) {
     onStateSnapshot,
     startGeneration: resumeGeneration,
     history: resumeHistory,
-    evaluate: async (individual, context) => {
-      const evalTrace = createSyntheticTrace(individual, context.rng);
-      const metrics = computeLocomotionFitness(evalTrace);
+    evaluate: async (individual) => {
+      const simulation = await simulateLocomotion({
+        morphGenome: individual.morph,
+        controllerGenome: individual.controller,
+        duration: simulationDuration,
+        timestep: simulationTimestep,
+        sampleInterval: simulationSampleInterval,
+        signal
+      });
+      const metrics = computeLocomotionFitness(simulation.trace);
       return {
         fitness: metrics.fitness,
-        metrics
+        metrics,
+        extras: {
+          trace: simulation.trace,
+          runtime: simulation.runtime
+        }
       };
     }
   });
