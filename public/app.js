@@ -18,6 +18,7 @@ const viewModeSelect = document.querySelector('#view-mode');
 const simulationToggleButton = document.querySelector('#simulation-toggle');
 const evolutionForm = document.querySelector('#evolution-config');
 const evolutionStartButton = document.querySelector('#evolution-start');
+const previewBestButton = document.querySelector('#preview-best');
 const evolutionProgress = document.querySelector('#evolution-progress');
 const statGeneration = document.querySelector('#stat-generation');
 const statBest = document.querySelector('#stat-best');
@@ -48,9 +49,23 @@ function deepClone(value) {
 
 let persistedRunState = loadRunState() ?? null;
 let latestReplay = loadReplayRecord() ?? null;
+let latestBestIndividual = null;
 let activeRunConfig = null;
 let activeRunTotalGenerations = 0;
 let generationViewer = null;
+
+function updatePreviewButtonState() {
+  if (previewBestButton) {
+    previewBestButton.disabled = !latestBestIndividual;
+  }
+}
+
+function setLatestBestIndividual(individual) {
+  latestBestIndividual = individual ? deepClone(individual) : null;
+  updatePreviewButtonState();
+}
+
+updatePreviewButtonState();
 
 function applyConfigToForm(config) {
   if (!config || !evolutionForm) {
@@ -105,6 +120,9 @@ function handleGenerationUpdate(entry) {
   if (!entry) {
     return;
   }
+  if (entry.bestIndividual) {
+    setLatestBestIndividual(entry.bestIndividual);
+  }
   const total = activeRunTotalGenerations || activeRunConfig?.generations || 1;
   const absoluteGeneration = Number.isFinite(entry.absoluteGeneration)
     ? entry.absoluteGeneration
@@ -148,6 +166,9 @@ function persistSnapshot(snapshot) {
 function handleRunComplete(result) {
   if (!activeRunConfig || !result) {
     return;
+  }
+  if (result.best) {
+    setLatestBestIndividual(result.best);
   }
   const total = activeRunTotalGenerations || activeRunConfig.generations || 0;
   const state = {
@@ -197,6 +218,7 @@ function storeReplay(buffer, metadata) {
 function applySavedRunStateToUi(state) {
   if (!state) {
     generationViewer?.reset();
+    setLatestBestIndividual(null);
     return;
   }
   if (state.config) {
@@ -207,6 +229,7 @@ function applySavedRunStateToUi(state) {
   evolutionPanel.updateProgress({ generation, total });
   if (Array.isArray(state.history) && state.history.length > 0) {
     const last = state.history[state.history.length - 1];
+    setLatestBestIndividual(state.best ?? last?.bestIndividual ?? null);
     evolutionPanel.updateStats({
       generation: (last?.generation ?? generation) + 1,
       bestFitness: last?.bestFitness,
@@ -222,6 +245,7 @@ function applySavedRunStateToUi(state) {
   } else {
     evolutionPanel.resetStats();
     generationViewer?.reset();
+    setLatestBestIndividual(state.best ?? null);
   }
 }
 
@@ -235,6 +259,7 @@ async function executeEvolutionRun({ config, resumeState = null, resetStats = tr
     clearRunState();
     persistedRunState = null;
     generationViewer?.reset();
+    setLatestBestIndividual(null);
   } else {
     generationViewer?.jumpToLatest({ silent: true });
   }
@@ -366,6 +391,19 @@ if (simulationToggleButton) {
 const physicsWorker = new Worker(new URL('../workers/physics.worker.js', import.meta.url), {
   type: 'module'
 });
+
+if (previewBestButton) {
+  previewBestButton.addEventListener('click', () => {
+    if (!latestBestIndividual) {
+      return;
+    }
+    updateStatus('Previewing best individual in physics viewer…');
+    physicsWorker.postMessage({
+      type: 'preview-individual',
+      individual: deepClone(latestBestIndividual)
+    });
+  });
+}
 
 let workerReady = false;
 let physicsRunning = false;
@@ -524,6 +562,7 @@ const neuromorphsApi = {
       evolutionPanel.resetStats();
       evolutionPanel.updateProgress({ generation: 0, total: 1 });
       generationViewer?.reset();
+      setLatestBestIndividual(null);
       updateStatus('Cleared stored evolution run.');
     }
   }
