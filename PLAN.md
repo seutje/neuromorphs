@@ -28,24 +28,25 @@
 ---
 
 ## Phase 1 — Physics Core (CDN Rapier + Worker)
-- [ ] **P1-01: Load Rapier WASM from CDN**
+- [x] **P1-01: Load Rapier WASM from CDN**
   - **Owner:** Physics Agent
   - **Inputs:** `@dimforge/rapier3d-compat` CDN
   - **Outputs:** WASM initialized in Worker
   - **DoD:** Cube drop test shows gravity in console
   - **Dependencies:** P0-02
-- [ ] **P1-02: Worker Script with ES Modules**
+- [x] **P1-02: Worker Script with ES Modules**
   - **Owner:** Physics Agent
   - **Inputs:** `worker.js` as module worker
   - **Outputs:** Stepper running physics loop
   - **DoD:** Logs position updates from Worker
   - **Dependencies:** P1-01
-- [ ] **P1-03: Shared Memory Protocol (optional)**  
+- [ ] **P1-03: Shared Memory Protocol (optional)**
   - **Owner:** Platform Agent
   - **Inputs:** SharedArrayBuffer via COOP/COEP headers (local server required)
   - **Outputs:** Snapshot arrays passed from worker to main
   - **DoD:** Renderer reads transforms without blocking
   - **Dependencies:** P1-02
+  - **Status:** Deferred until cross-origin isolation is required.
 
 ---
 
