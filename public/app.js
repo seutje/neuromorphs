@@ -1,8 +1,10 @@
 import {
   AmbientLight,
+  Box3,
   BoxGeometry,
   Color,
   DirectionalLight,
+  Group,
   Mesh,
   MeshStandardMaterial,
   PerspectiveCamera,
@@ -10,6 +12,10 @@ import {
   Vector3,
   WebGLRenderer
 } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import {
+  buildMorphologyBlueprint,
+  generateSampleMorphGenomes
+} from '../genomes/morphGenome.js';
 
 const canvas = document.querySelector('#viewport');
 const statusMessage = document.querySelector('#status-message');
@@ -30,38 +36,53 @@ const scene = new Scene();
 scene.background = new Color('#020617');
 
 const camera = new PerspectiveCamera(45, 1, 0.1, 100);
-camera.position.set(4, 3, 6);
-camera.lookAt(new Vector3(0, 0, 0));
+camera.position.set(5, 3.4, 7);
+camera.lookAt(new Vector3(0, 0.6, 0));
 
 const ambient = new AmbientLight('#e2e8f0', 0.6);
-const keyLight = new DirectionalLight('#60a5fa', 0.8);
-keyLight.position.set(5, 6, 4);
-const fillLight = new DirectionalLight('#f472b6', 0.3);
-fillLight.position.set(-4, 2, -5);
+const keyLight = new DirectionalLight('#60a5fa', 0.85);
+keyLight.position.set(6, 6.5, 4);
+const fillLight = new DirectionalLight('#f472b6', 0.35);
+fillLight.position.set(-5, 2.5, -6);
 scene.add(ambient, keyLight, fillLight);
 
-const groundGeometry = new BoxGeometry(10, 0.2, 10);
+const groundGeometry = new BoxGeometry(16, 0.2, 12);
 const groundMaterial = new MeshStandardMaterial({
-  color: '#1e293b',
-  roughness: 0.85,
-  metalness: 0.05
+  color: '#111827',
+  roughness: 0.88,
+  metalness: 0.04
 });
 const ground = new Mesh(groundGeometry, groundMaterial);
-ground.position.y = -0.6;
+ground.position.y = -0.62;
 scene.add(ground);
 
-const cubeGeometry = new BoxGeometry(1, 1, 1);
-const cubeMaterial = new MeshStandardMaterial({
-  color: '#38bdf8',
-  roughness: 0.35,
-  metalness: 0.1
-});
-const cube = new Mesh(cubeGeometry, cubeMaterial);
-scene.add(cube);
+const previewPad = new Mesh(
+  new BoxGeometry(7.2, 0.06, 7.2),
+  new MeshStandardMaterial({
+    color: '#0f172a',
+    roughness: 0.9,
+    metalness: 0.03
+  })
+);
+previewPad.position.set(-4.6, -0.65, -3.3);
+scene.add(previewPad);
 
-const sharedBodyMeshes = {
-  'test-cube': cube
-};
+const dynamicBodiesRoot = new Group();
+scene.add(dynamicBodiesRoot);
+
+const previewRoot = new Group();
+previewRoot.position.set(-4.6, -0.59, -3.3);
+previewRoot.scale.setScalar(0.82);
+scene.add(previewRoot);
+
+const previewGroups = [];
+const previewBounds = new Box3();
+const previewCenter = new Vector3();
+const previewSize = new Vector3();
+
+const sharedBodyMeshes = new Map();
+let sharedDescriptorMap = new Map();
+let primaryBodyId = null;
 
 const META_DEFAULT_VERSION_INDEX = 0;
 const META_DEFAULT_WRITE_LOCK_INDEX = 1;
@@ -73,8 +94,11 @@ let sharedStateVersion = 0;
 let sharedStateEnabled = false;
 
 const rendererClock = {
-  lastLogTimestamp: 0
+  lastLogTimestamp: 0,
+  lastFrameTimestamp: null
 };
+
+const scratchColor = new Color();
 
 function resize() {
   const width = canvas.clientWidth;
@@ -89,6 +113,57 @@ function resize() {
 
 window.addEventListener('resize', resize);
 resize();
+
+function ensureSharedBodyMesh(descriptor) {
+  if (!descriptor || typeof descriptor.id !== 'string') {
+    return null;
+  }
+  const halfExtents = Array.isArray(descriptor.halfExtents)
+    ? descriptor.halfExtents
+    : [0.5, 0.5, 0.5];
+  const color = descriptor.material?.color ?? '#38bdf8';
+  const roughness = descriptor.material?.roughness ?? 0.38;
+  const metalness = descriptor.material?.metalness ?? 0.18;
+
+  let mesh = sharedBodyMeshes.get(descriptor.id);
+  const width = halfExtents[0] * 2;
+  const height = halfExtents[1] * 2;
+  const depth = halfExtents[2] * 2;
+
+  if (!mesh) {
+    const geometry = new BoxGeometry(width, height, depth);
+    const material = new MeshStandardMaterial({
+      color,
+      roughness,
+      metalness
+    });
+    mesh = new Mesh(geometry, material);
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    dynamicBodiesRoot.add(mesh);
+    sharedBodyMeshes.set(descriptor.id, mesh);
+  } else {
+    const geometry = mesh.geometry;
+    if (
+      geometry.parameters?.width !== width ||
+      geometry.parameters?.height !== height ||
+      geometry.parameters?.depth !== depth
+    ) {
+      mesh.geometry.dispose();
+      mesh.geometry = new BoxGeometry(width, height, depth);
+    }
+    const material = mesh.material;
+    scratchColor.set(color);
+    if (material.color?.getHex() !== scratchColor.getHex()) {
+      material.color.set(scratchColor);
+    }
+    material.roughness = roughness;
+    material.metalness = metalness;
+  }
+
+  mesh.visible = true;
+  return mesh;
+}
 
 function updateSharedTransforms() {
   if (!sharedStateMeta || !sharedStateFloats || !sharedStateLayout) {
@@ -119,7 +194,7 @@ function updateSharedTransforms() {
   sharedStateVersion = version;
   for (let i = 0; i < bodyIds.length; i += 1) {
     const bodyId = bodyIds[i];
-    const mesh = sharedBodyMeshes[bodyId];
+    const mesh = sharedBodyMeshes.get(bodyId);
     if (!mesh) {
       continue;
     }
@@ -143,19 +218,84 @@ function updateSharedTransforms() {
       mesh.quaternion.set(rx, ry, rz, rw);
     }
   }
-  const now = performance.now();
-  if (now - rendererClock.lastLogTimestamp >= 500) {
-    rendererClock.lastLogTimestamp = now;
-    console.info('[Shared State] cube height:', cube.position.y.toFixed(3));
+  if (primaryBodyId) {
+    const primaryMesh = sharedBodyMeshes.get(primaryBodyId);
+    if (primaryMesh) {
+      const now = performance.now();
+      if (now - rendererClock.lastLogTimestamp >= 500) {
+        rendererClock.lastLogTimestamp = now;
+        console.info(
+          '[Shared State] primary body height:',
+          primaryMesh.position.y.toFixed(3)
+        );
+      }
+    }
   }
 }
 
-renderer.setAnimationLoop(() => {
-  if (sharedStateEnabled) {
-    updateSharedTransforms();
-  }
-  renderer.render(scene, camera);
-});
+function populateMorphPreview() {
+  const genomes = generateSampleMorphGenomes(12);
+  const columns = 4;
+  const spacing = 1.8;
+  const rows = Math.ceil(genomes.length / columns);
+  const offsetX = ((columns - 1) * spacing) / 2;
+  const offsetZ = ((rows - 1) * spacing) / 2;
+  genomes.forEach((genome, index) => {
+    const blueprint = buildMorphologyBlueprint(genome);
+    if (blueprint.errors.length > 0) {
+      console.warn('Preview blueprint validation failed:', blueprint.errors.join('; '));
+      return;
+    }
+    const materialMap = new Map(
+      Object.entries(blueprint.materials).map(([key, value]) => [key, value])
+    );
+    const group = new Group();
+    blueprint.bodies.forEach((body) => {
+      const halfExtents = body.halfExtents;
+      const geometry = new BoxGeometry(
+        halfExtents[0] * 2,
+        halfExtents[1] * 2,
+        halfExtents[2] * 2
+      );
+      const materialInfo = materialMap.get(body.materialId) || body.material || {};
+      const material = new MeshStandardMaterial({
+        color: materialInfo.color ?? '#38bdf8',
+        roughness: materialInfo.roughness ?? 0.38,
+        metalness: materialInfo.metalness ?? 0.18
+      });
+      const mesh = new Mesh(geometry, material);
+      mesh.position.set(
+        body.translation[0],
+        body.translation[1],
+        body.translation[2]
+      );
+      mesh.quaternion.set(
+        body.rotation[0],
+        body.rotation[1],
+        body.rotation[2],
+        body.rotation[3]
+      );
+      group.add(mesh);
+    });
+    previewBounds.setFromObject(group);
+    previewBounds.getCenter(previewCenter);
+    previewBounds.getSize(previewSize);
+    group.children.forEach((child) => {
+      child.position.sub(previewCenter);
+    });
+    const row = Math.floor(index / columns);
+    const col = index % columns;
+    group.position.set(
+      col * spacing - offsetX,
+      previewSize.y * 0.5,
+      row * spacing - offsetZ
+    );
+    previewRoot.add(group);
+    previewGroups.push(group);
+  });
+}
+
+populateMorphPreview();
 
 const physicsWorker = new Worker(
   new URL('../workers/physics.worker.js', import.meta.url),
@@ -179,20 +319,43 @@ physicsWorker.addEventListener('message', (event) => {
     workerReady = true;
     if (statusMessage) {
       statusMessage.textContent =
-        'Physics worker ready. Starting Rapier drop test…';
+        'Physics worker ready. Streaming hopper morph simulation…';
     }
     if (actionButton) {
       actionButton.disabled = false;
     }
     physicsWorker.postMessage({ type: 'start' });
   } else if (data.type === 'shared-state') {
-    if (data.buffer instanceof SharedArrayBuffer && data.layout) {
-      const metaLength = data.layout.metaLength ?? 0;
-      const floatsPerBody = data.layout.floatsPerBody ?? 0;
-      const bodyIds = Array.isArray(data.layout.bodyIds)
-        ? data.layout.bodyIds
-        : [];
-      const bodyCount = data.layout.bodyCount ?? bodyIds.length;
+    const layout = data.layout;
+    if (!layout || typeof layout !== 'object') {
+      return;
+    }
+    const bodyIds = Array.isArray(layout.bodyIds)
+      ? layout.bodyIds
+      : Array.isArray(layout.bodies)
+      ? layout.bodies.map((descriptor) => descriptor.id)
+      : [];
+    const descriptorMap = new Map();
+    if (Array.isArray(layout.bodies)) {
+      layout.bodies.forEach((descriptor) => {
+        descriptorMap.set(descriptor.id, descriptor);
+        ensureSharedBodyMesh(descriptor);
+      });
+    }
+    sharedDescriptorMap = descriptorMap;
+    primaryBodyId = bodyIds[0] ?? null;
+    sharedStateLayout = {
+      ...layout,
+      bodyIds,
+      descriptorMap
+    };
+    for (const [id, mesh] of sharedBodyMeshes.entries()) {
+      mesh.visible = descriptorMap.has(id);
+    }
+    if (data.buffer instanceof SharedArrayBuffer) {
+      const metaLength = layout.metaLength ?? 0;
+      const floatsPerBody = layout.floatsPerBody ?? 0;
+      const bodyCount = layout.bodyCount ?? bodyIds.length;
       if (metaLength > 0 && floatsPerBody > 0 && bodyCount > 0) {
         const metaBytes = metaLength * Int32Array.BYTES_PER_ELEMENT;
         sharedStateMeta = new Int32Array(data.buffer, 0, metaLength);
@@ -201,20 +364,23 @@ physicsWorker.addEventListener('message', (event) => {
           metaBytes,
           bodyCount * floatsPerBody
         );
-        sharedStateLayout = {
-          ...data.layout,
-          bodyCount,
-          bodyIds
-        };
         sharedStateVersion = Atomics.load(
           sharedStateMeta,
-          data.layout.metaIndices?.version ?? META_DEFAULT_VERSION_INDEX
+          layout.metaIndices?.version ?? META_DEFAULT_VERSION_INDEX
         );
         sharedStateEnabled = true;
         if (statusMessage) {
           statusMessage.textContent =
-            'Shared memory bridge established. Rendering live physics state.';
+            'Shared memory bridge established. Hopper pose updates are live.';
         }
+      }
+    } else {
+      sharedStateMeta = null;
+      sharedStateFloats = null;
+      sharedStateEnabled = false;
+      if (statusMessage) {
+        statusMessage.textContent =
+          'Shared memory unavailable — falling back to message-based updates.';
       }
     }
   } else if (data.type === 'shared-state-error') {
@@ -228,33 +394,50 @@ physicsWorker.addEventListener('message', (event) => {
     }
     if (statusMessage && !sharedStateEnabled) {
       statusMessage.textContent = physicsRunning
-        ? 'Rapier is stepping inside a worker. Watch the cube fall and settle.'
-        : 'Simulation paused. Resume to continue the drop test.';
+        ? 'Physics worker stepping. Awaiting shared memory access…'
+        : 'Simulation paused. Resume to continue the hopper test.';
     }
   } else if (data.type === 'tick') {
     const useSharedState = sharedStateEnabled && sharedStateMeta;
     if (!useSharedState) {
-      const cubeState = Array.isArray(data.bodies)
-        ? data.bodies.find((body) => body?.id === 'test-cube')
-        : undefined;
-      if (cubeState) {
-        const { translation, rotation } = cubeState;
-        if (translation) {
-          cube.position.set(translation.x, translation.y, translation.z);
+      const bodies = Array.isArray(data.bodies) ? data.bodies : [];
+      bodies.forEach((bodyState) => {
+        if (!bodyState || typeof bodyState.id !== 'string') {
+          return;
         }
-        if (rotation) {
-          cube.quaternion.set(
-            rotation.x,
-            rotation.y,
-            rotation.z,
-            rotation.w
+        let mesh = sharedBodyMeshes.get(bodyState.id);
+        if (!mesh) {
+          const descriptor = sharedDescriptorMap.get(bodyState.id) || {
+            id: bodyState.id,
+            halfExtents: [0.5, 0.5, 0.5],
+            material: {}
+          };
+          mesh = ensureSharedBodyMesh(descriptor);
+        }
+        if (mesh && bodyState.translation) {
+          mesh.position.set(
+            bodyState.translation.x,
+            bodyState.translation.y,
+            bodyState.translation.z
           );
         }
-        if (typeof data.timestamp === 'number') {
+        if (mesh && bodyState.rotation) {
+          mesh.quaternion.set(
+            bodyState.rotation.x,
+            bodyState.rotation.y,
+            bodyState.rotation.z,
+            bodyState.rotation.w
+          );
+        }
+      });
+      if (typeof data.timestamp === 'number') {
+        const primaryState =
+          bodies.find((body) => body.id === primaryBodyId) || bodies[0];
+        if (primaryState?.translation) {
           if (data.timestamp - lastLogTimestamp >= 500) {
             console.info(
-              '[Physics Worker] cube height:',
-              translation.y.toFixed(3)
+              '[Physics Worker] primary body height:',
+              primaryState.translation.y.toFixed(3)
             );
             lastLogTimestamp = data.timestamp;
           }
@@ -263,7 +446,7 @@ physicsWorker.addEventListener('message', (event) => {
     } else if (typeof data.version === 'number') {
       if (statusMessage && physicsRunning) {
         statusMessage.textContent =
-          'Shared memory synchronized. Cube state streaming from worker.';
+          'Shared memory synchronized. Hopper pose streaming from worker.';
       }
     }
   } else if (data.type === 'error') {
@@ -283,4 +466,19 @@ actionButton?.addEventListener('click', () => {
     return;
   }
   physicsWorker.postMessage({ type: physicsRunning ? 'pause' : 'start' });
+});
+
+renderer.setAnimationLoop((timestamp) => {
+  if (sharedStateEnabled) {
+    updateSharedTransforms();
+  }
+  if (rendererClock.lastFrameTimestamp !== null) {
+    const deltaSeconds = (timestamp - rendererClock.lastFrameTimestamp) / 1000;
+    previewRoot.rotation.y += deltaSeconds * 0.35;
+    previewGroups.forEach((group, index) => {
+      group.rotation.y += deltaSeconds * (0.15 + (index % 5) * 0.05);
+    });
+  }
+  rendererClock.lastFrameTimestamp = timestamp;
+  renderer.render(scene, camera);
 });
