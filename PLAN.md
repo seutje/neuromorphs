@@ -99,23 +99,26 @@
 ---
 
 ## Phase 4 — Evolutionary Algorithm (EA)
-- [ ] **P4-01: Simple EA Loop (Selection, Mutation, Evaluation)**
+- [x] **P4-01: Simple EA Loop (Selection, Mutation, Evaluation)**
   - **Owner:** Evolution Agent
   - **Inputs:** JSON genomes
   - **Outputs:** Next-gen population
   - **DoD:** Runs 10 generations in <1min, logs fitness
   - **Dependencies:** P2, P3
-- [ ] **P4-02: Mutation Functions**
+  - **Status:** Added a deterministic EA engine with tournament selection, elitism, and a demo run that logs generation stats on load.
+- [x] **P4-02: Mutation Functions**
   - **Owner:** Evolution Agent
   - **Outputs:** Add limb, resize block, jitter weight
   - **DoD:** Mutated genome passes schema validation
   - **Dependencies:** P2-01, P3-01
-- [ ] **P4-03: Fitness Function (Locomotion)**
+  - **Status:** Implemented morph and controller mutators with recorded operations while preserving schema invariants.
+- [x] **P4-03: Fitness Function (Locomotion)**
   - **Owner:** Task Agent
   - **Inputs:** COM displacement
   - **Outputs:** Fitness score
   - **DoD:** Faster movers score higher consistently
   - **Dependencies:** P3-03
+  - **Status:** Introduced locomotion fitness analysis utilities and synthetic traces that reward displacement while penalizing falls.
 
 ---
 
@@ -179,4 +182,3 @@
 - No build step: all ES modules must be supported directly in browser.
 - If workers require cross-origin isolation (for SAB), serve via npm on port 8000 with headers.
 - Performance goal: 128 creatures × 10s at near real-time on laptop.
-

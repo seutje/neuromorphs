@@ -16,6 +16,7 @@ import {
   buildMorphologyBlueprint,
   generateSampleMorphGenomes
 } from '../genomes/morphGenome.js';
+import { startDemoOnLoad } from './evolution/demo.js';
 
 const canvas = document.querySelector('#viewport');
 const statusMessage = document.querySelector('#status-message');
@@ -296,6 +297,7 @@ function populateMorphPreview() {
 }
 
 populateMorphPreview();
+startDemoOnLoad();
 
 const physicsWorker = new Worker(
   new URL('../workers/physics.worker.js', import.meta.url),
