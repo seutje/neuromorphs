@@ -64,7 +64,9 @@ export async function runEvolution({
   elitism = 1,
   tournamentSize = 3,
   mutationConfig = {},
-  logger
+  logger,
+  signal,
+  onGeneration
 }) {
   if (!Array.isArray(initialPopulation) || initialPopulation.length === 0) {
     throw new Error('initialPopulation must contain at least one individual.');
@@ -73,76 +75,121 @@ export async function runEvolution({
     throw new Error('evaluate callback is required.');
   }
 
-  let population = initialPopulation.map((individual, index) => ({
-    ...clone(individual),
-    id: individual.id ?? `ind-${index}`
-  }));
-  const history = [];
-  const globalRng = rng;
-
-  for (let generation = 0; generation < generations; generation += 1) {
-    const evaluated = [];
-    for (let index = 0; index < population.length; index += 1) {
-      const individual = population[index];
-      const evalRng = splitRng(globalRng, `${generation}-${index}`);
-      const evaluation = await evaluate(stripEvaluation(individual), {
-        generation,
-        index,
-        rng: evalRng
-      });
-      const normalized = normalizeEvaluation(evaluation);
-      evaluated.push({
-        ...clone(individual),
-        fitness: normalized.fitness,
-        metrics: normalized.metrics,
-        extras: normalized.extras
-      });
-    }
-
-    evaluated.sort((a, b) => (b.fitness ?? 0) - (a.fitness ?? 0));
-    const bestFitness = evaluated[0]?.fitness ?? 0;
-    const meanFitness =
-      evaluated.reduce((total, entry) => total + (entry.fitness ?? 0), 0) /
-      Math.max(1, evaluated.length);
-    const bestIndividual = evaluated[0] ? stripEvaluation(evaluated[0]) : null;
-
-    history.push({
-      generation,
-      bestFitness,
-      meanFitness,
-      bestIndividual
-    });
-
-    if (typeof logger?.info === 'function') {
-      logger.info(
-        `[EA] generation=${generation} best=${bestFitness.toFixed(3)} mean=${meanFitness.toFixed(3)}`
-      );
-    }
-
-    const nextPopulation = [];
-    const eliteCount = Math.min(Math.max(0, elitism), evaluated.length);
-    for (let i = 0; i < eliteCount; i += 1) {
-      nextPopulation.push(stripEvaluation(evaluated[i]));
-    }
-
-    while (nextPopulation.length < population.length) {
-      const parent = tournamentSelect(evaluated, globalRng, tournamentSize) ?? evaluated[0];
-      const child = mutate(
-        parent,
-        splitRng(globalRng, `mut-${generation}-${nextPopulation.length}`),
-        mutationConfig
-      );
-      nextPopulation.push(child);
-    }
-
-    population = nextPopulation;
+  if (signal?.aborted) {
+    throw signal.reason ?? new Error('Evolution aborted');
   }
 
-  const finalBest = history[history.length - 1]?.bestIndividual ?? null;
+  let aborted = false;
+  const abortListener = signal
+    ? () => {
+        aborted = true;
+      }
+    : null;
 
-  return {
-    history,
-    population,
-    best: finalBest
-  };
+  if (signal && abortListener) {
+    signal.addEventListener('abort', abortListener);
+  }
+
+  function throwIfAborted() {
+    if (!aborted) {
+      return;
+    }
+    const reason = signal?.reason ?? new Error('Evolution aborted');
+    throw reason;
+  }
+
+  try {
+    let population = initialPopulation.map((individual, index) => ({
+      ...clone(individual),
+      id: individual.id ?? `ind-${index}`
+    }));
+    const history = [];
+    const globalRng = rng;
+
+    for (let generation = 0; generation < generations; generation += 1) {
+      throwIfAborted();
+      const evaluated = [];
+      for (let index = 0; index < population.length; index += 1) {
+        throwIfAborted();
+        const individual = population[index];
+        const evalRng = splitRng(globalRng, `${generation}-${index}`);
+        const evaluation = await evaluate(stripEvaluation(individual), {
+          generation,
+          index,
+          rng: evalRng
+        });
+        throwIfAborted();
+        const normalized = normalizeEvaluation(evaluation);
+        evaluated.push({
+          ...clone(individual),
+          fitness: normalized.fitness,
+          metrics: normalized.metrics,
+          extras: normalized.extras
+        });
+      }
+
+      evaluated.sort((a, b) => (b.fitness ?? 0) - (a.fitness ?? 0));
+      const bestFitness = evaluated[0]?.fitness ?? 0;
+      const meanFitness =
+        evaluated.reduce((total, entry) => total + (entry.fitness ?? 0), 0) /
+        Math.max(1, evaluated.length);
+      const bestIndividual = evaluated[0] ? stripEvaluation(evaluated[0]) : null;
+
+      const generationSummary = {
+        generation,
+        bestFitness,
+        meanFitness,
+        bestIndividual
+      };
+      history.push(generationSummary);
+
+      if (typeof onGeneration === 'function') {
+        onGeneration({
+          ...generationSummary,
+          evaluated: evaluated.map((entry) => ({
+            id: entry.id,
+            fitness: entry.fitness,
+            metrics: entry.metrics
+          }))
+        });
+      }
+
+      if (typeof logger?.info === 'function') {
+        logger.info(
+          `[EA] generation=${generation} best=${bestFitness.toFixed(3)} mean=${meanFitness.toFixed(3)}`
+        );
+      }
+
+      const nextPopulation = [];
+      const eliteCount = Math.min(Math.max(0, elitism), evaluated.length);
+      for (let i = 0; i < eliteCount; i += 1) {
+        nextPopulation.push(stripEvaluation(evaluated[i]));
+      }
+
+      while (nextPopulation.length < population.length) {
+        throwIfAborted();
+        const parent = tournamentSelect(evaluated, globalRng, tournamentSize) ?? evaluated[0];
+        const child = mutate(
+          parent,
+          splitRng(globalRng, `mut-${generation}-${nextPopulation.length}`),
+          mutationConfig
+        );
+        nextPopulation.push(child);
+      }
+
+      population = nextPopulation;
+    }
+
+    const finalBest = history[history.length - 1]?.bestIndividual ?? null;
+
+    return {
+      history,
+      population,
+      best: finalBest
+    };
+  } finally {
+    if (signal && abortListener) {
+      signal.removeEventListener('abort', abortListener);
+    }
+  }
 }

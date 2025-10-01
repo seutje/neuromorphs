@@ -5,12 +5,23 @@ import { mutateMorphGenome, mutateControllerGenome } from './mutation.js';
 import { computeLocomotionFitness } from './fitness.js';
 import { runEvolution } from './evolutionEngine.js';
 
-function buildInitialPopulation({ populationSize, baseMorph, baseController, rng }) {
+function buildInitialPopulation({
+  populationSize,
+  baseMorph,
+  baseController,
+  rng,
+  mutationConfig
+}) {
   return Array.from({ length: populationSize }, (_, index) => {
-    const morph = mutateMorphGenome(baseMorph, splitRng(rng, `init-morph-${index}`)).genome;
+    const morph = mutateMorphGenome(
+      baseMorph,
+      splitRng(rng, `init-morph-${index}`),
+      mutationConfig?.morph
+    ).genome;
     const controller = mutateControllerGenome(
       baseController,
-      splitRng(rng, `init-ctrl-${index}`)
+      splitRng(rng, `init-ctrl-${index}`),
+      mutationConfig?.controller
     ).genome;
     return {
       id: `demo-${index}`,
@@ -42,30 +53,47 @@ function createSyntheticTrace(individual, rng, steps = 30) {
 }
 
 export async function runEvolutionDemo(options = {}) {
-  const config = {
-    seed: 42,
-    generations: 10,
-    populationSize: 12,
-    elitism: 2,
-    tournamentSize: 3,
-    ...options
+  const {
+    seed = 42,
+    generations = 10,
+    populationSize = 12,
+    elitism = 2,
+    tournamentSize = 3,
+    mutationConfig: overrideMutationConfig,
+    morphMutation,
+    controllerMutation,
+    signal,
+    onGeneration,
+    onComplete,
+    logger = console
+  } = options;
+
+  const mutationConfig = {
+    morph: overrideMutationConfig?.morph ?? morphMutation ?? {},
+    controller: overrideMutationConfig?.controller ?? controllerMutation ?? {}
   };
-  const rng = createRng(config.seed);
-  const baseMorph = createDefaultMorphGenome();
-  const baseController = createDefaultControllerGenome();
+
+  const rng = createRng(seed);
+  const baseMorph = options.baseMorph ?? createDefaultMorphGenome();
+  const baseController = options.baseController ?? createDefaultControllerGenome();
   const initialPopulation = buildInitialPopulation({
-    populationSize: config.populationSize,
+    populationSize,
     baseMorph,
     baseController,
-    rng
+    rng,
+    mutationConfig
   });
 
   const result = await runEvolution({
     initialPopulation,
-    generations: config.generations,
-    elitism: config.elitism,
-    tournamentSize: config.tournamentSize,
+    generations,
+    elitism,
+    tournamentSize,
     rng,
+    mutationConfig,
+    signal,
+    logger,
+    onGeneration,
     evaluate: async (individual, context) => {
       const evalTrace = createSyntheticTrace(individual, context.rng);
       const metrics = computeLocomotionFitness(evalTrace);
@@ -76,23 +104,9 @@ export async function runEvolutionDemo(options = {}) {
     }
   });
 
-  return result;
-}
+  if (typeof onComplete === 'function') {
+    onComplete(result);
+  }
 
-export function startDemoOnLoad() {
-  runEvolutionDemo()
-    .then((result) => {
-      const final = result.history[result.history.length - 1];
-      if (!final) {
-        return;
-      }
-      const bestFitness = Number(final.bestFitness ?? 0).toFixed(3);
-      const meanFitness = Number(final.meanFitness ?? 0).toFixed(3);
-      console.info(
-        `[EA Demo] generations=${result.history.length} bestFitness=${bestFitness} meanFitness=${meanFitness}`
-      );
-    })
-    .catch((error) => {
-      console.warn('Evolution demo failed:', error);
-    });
+  return result;
 }

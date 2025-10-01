@@ -13,18 +13,136 @@
     </header>
     <main class="content">
       <section class="viewport-panel">
-        <canvas id="viewport" aria-label="Creature preview" role="img"></canvas>
-        <p class="status" id="status-message">Loading WebGL and physics modules…</p>
+        <div class="viewer-toolbar" role="group" aria-label="Viewport controls">
+          <div class="viewer-controls">
+            <label class="control-label" for="view-mode">View</label>
+            <select id="view-mode" class="view-select">
+              <option value="orbit">Orbit</option>
+              <option value="follow">Follow</option>
+            </select>
+            <button id="simulation-toggle" type="button" aria-pressed="false">
+              Pause Simulation
+            </button>
+          </div>
+          <p class="status" id="status-message">Loading WebGL and physics modules…</p>
+        </div>
+        <canvas id="viewport" aria-label="Creature viewport" role="img"></canvas>
       </section>
-      <section class="info-panel">
-        <h2>Welcome</h2>
-        <p>
-          The physics core now runs inside a dedicated Web Worker. Rapier’s WebAssembly module instantiates
-          a two-part hopper from the shared genome schema, while the main thread renders both the live
-          simulation and a morph preview grid with Three.js. Use the control button to pause or resume the
-          simulation loop.
+      <section class="sidebar-panel">
+        <h2>Evolution Run</h2>
+        <p class="panel-description">
+          Tune parameters and launch a deterministic evolution sweep. Progress updates live while the
+          synthetic evaluation trace is generated.
         </p>
-        <button id="action-button" type="button">Pause Simulation</button>
+        <form id="evolution-config" class="config-form">
+          <fieldset>
+            <legend>Population</legend>
+            <label for="config-seed">Seed</label>
+            <input id="config-seed" name="seed" type="number" min="0" value="42" />
+            <label for="config-population">Population Size</label>
+            <input
+              id="config-population"
+              name="populationSize"
+              type="number"
+              min="4"
+              max="128"
+              value="12"
+            />
+            <label for="config-generations">Generations</label>
+            <input
+              id="config-generations"
+              name="generations"
+              type="number"
+              min="1"
+              max="100"
+              value="10"
+            />
+          </fieldset>
+          <fieldset>
+            <legend>Morph Mutation</legend>
+            <label for="config-morph-add">Add Limb Chance</label>
+            <input
+              id="config-morph-add"
+              name="morphAddLimbChance"
+              type="number"
+              min="0"
+              max="1"
+              step="0.05"
+              value="0.35"
+            />
+            <label for="config-morph-resize">Resize Chance</label>
+            <input
+              id="config-morph-resize"
+              name="morphResizeChance"
+              type="number"
+              min="0"
+              max="1"
+              step="0.05"
+              value="0.85"
+            />
+            <label for="config-morph-joint">Joint Jitter Chance</label>
+            <input
+              id="config-morph-joint"
+              name="morphJointJitterChance"
+              type="number"
+              min="0"
+              max="1"
+              step="0.05"
+              value="0.65"
+            />
+          </fieldset>
+          <fieldset>
+            <legend>Controller Mutation</legend>
+            <label for="config-ctrl-weight">Weight Jitter Chance</label>
+            <input
+              id="config-ctrl-weight"
+              name="controllerWeightChance"
+              type="number"
+              min="0"
+              max="1"
+              step="0.05"
+              value="0.85"
+            />
+            <label for="config-ctrl-osc">Oscillator Tune Chance</label>
+            <input
+              id="config-ctrl-osc"
+              name="controllerOscillatorChance"
+              type="number"
+              min="0"
+              max="1"
+              step="0.05"
+              value="0.6"
+            />
+            <label for="config-ctrl-conn">Add Connection Chance</label>
+            <input
+              id="config-ctrl-conn"
+              name="controllerAddConnectionChance"
+              type="number"
+              min="0"
+              max="1"
+              step="0.05"
+              value="0.45"
+            />
+          </fieldset>
+        </form>
+        <div class="run-controls">
+          <button id="evolution-start" type="button">Start Evolution</button>
+          <progress id="evolution-progress" value="0" max="1" aria-live="polite"></progress>
+        </div>
+        <dl id="evolution-stats" class="stats-readout">
+          <div class="stat-row">
+            <dt>Generation</dt>
+            <dd id="stat-generation">—</dd>
+          </div>
+          <div class="stat-row">
+            <dt>Best Fitness</dt>
+            <dd id="stat-best">—</dd>
+          </div>
+          <div class="stat-row">
+            <dt>Mean Fitness</dt>
+            <dd id="stat-mean">—</dd>
+          </div>
+        </dl>
       </section>
     </main>
     <footer class="site-footer">

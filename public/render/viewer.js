@@ -1,0 +1,444 @@
+import {
+  AmbientLight,
+  Box3,
+  BoxGeometry,
+  Color,
+  DirectionalLight,
+  Group,
+  Mesh,
+  MeshStandardMaterial,
+  PerspectiveCamera,
+  Scene,
+  Vector3,
+  WebGLRenderer
+} from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+import {
+  buildMorphologyBlueprint,
+  generateSampleMorphGenomes
+} from '../../genomes/morphGenome.js';
+
+const META_DEFAULT_VERSION_INDEX = 0;
+const META_DEFAULT_WRITE_LOCK_INDEX = 1;
+const FOLLOW_OFFSET = new Vector3(4.5, 2.8, 4.5);
+const LOOK_OFFSET = new Vector3(0, 0.6, 0);
+
+export function createViewer(canvas) {
+  if (!canvas) {
+    throw new Error('createViewer requires a canvas element.');
+  }
+
+  const renderer = new WebGLRenderer({
+    canvas,
+    antialias: true,
+    alpha: true
+  });
+  renderer.setPixelRatio(window.devicePixelRatio ?? 1);
+
+  const scene = new Scene();
+  scene.background = new Color('#020617');
+
+  const camera = new PerspectiveCamera(45, 1, 0.1, 100);
+  camera.position.set(5, 3.4, 7);
+  camera.lookAt(new Vector3(0, 0.6, 0));
+
+  const controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.05;
+  controls.autoRotate = false;
+  controls.target.set(0, 0.6, 0);
+
+  const ambient = new AmbientLight('#e2e8f0', 0.6);
+  const keyLight = new DirectionalLight('#60a5fa', 0.85);
+  keyLight.position.set(6, 6.5, 4);
+  const fillLight = new DirectionalLight('#f472b6', 0.35);
+  fillLight.position.set(-5, 2.5, -6);
+  scene.add(ambient, keyLight, fillLight);
+
+  const groundGeometry = new BoxGeometry(16, 0.2, 12);
+  const groundMaterial = new MeshStandardMaterial({
+    color: '#111827',
+    roughness: 0.88,
+    metalness: 0.04
+  });
+  const ground = new Mesh(groundGeometry, groundMaterial);
+  ground.position.y = -0.62;
+  ground.receiveShadow = false;
+  scene.add(ground);
+
+  const previewPad = new Mesh(
+    new BoxGeometry(7.2, 0.06, 7.2),
+    new MeshStandardMaterial({
+      color: '#0f172a',
+      roughness: 0.9,
+      metalness: 0.03
+    })
+  );
+  previewPad.position.set(-4.6, -0.65, -3.3);
+  scene.add(previewPad);
+
+  const dynamicBodiesRoot = new Group();
+  scene.add(dynamicBodiesRoot);
+
+  const previewRoot = new Group();
+  previewRoot.position.set(-4.6, -0.59, -3.3);
+  previewRoot.scale.setScalar(0.82);
+  scene.add(previewRoot);
+
+  const previewGroups = [];
+  const previewBounds = new Box3();
+  const previewCenter = new Vector3();
+  const previewSize = new Vector3();
+
+  const sharedBodyMeshes = new Map();
+  let sharedDescriptorMap = new Map();
+  let primaryBodyId = null;
+  let viewMode = 'orbit';
+  let lastFrameTimestamp = null;
+  let logClock = 0;
+  const primaryLerpTarget = new Vector3();
+  const lastPrimaryPosition = new Vector3();
+
+  let sharedState = null;
+
+  function resize() {
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    if (!width || !height) {
+      return;
+    }
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    renderer.setSize(width, height, false);
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+
+  function ensureSharedBodyMesh(descriptor) {
+    if (!descriptor || typeof descriptor.id !== 'string') {
+      return null;
+    }
+    const halfExtents = Array.isArray(descriptor.halfExtents)
+      ? descriptor.halfExtents
+      : [0.5, 0.5, 0.5];
+    const color = descriptor.material?.color ?? '#38bdf8';
+    const roughness = descriptor.material?.roughness ?? 0.38;
+    const metalness = descriptor.material?.metalness ?? 0.18;
+
+    let mesh = sharedBodyMeshes.get(descriptor.id);
+    const width = halfExtents[0] * 2;
+    const height = halfExtents[1] * 2;
+    const depth = halfExtents[2] * 2;
+
+    if (!mesh) {
+      const geometry = new BoxGeometry(width, height, depth);
+      const material = new MeshStandardMaterial({
+        color,
+        roughness,
+        metalness
+      });
+      mesh = new Mesh(geometry, material);
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      dynamicBodiesRoot.add(mesh);
+      sharedBodyMeshes.set(descriptor.id, mesh);
+    } else {
+      const geometry = mesh.geometry;
+      if (
+        geometry.parameters?.width !== width ||
+        geometry.parameters?.height !== height ||
+        geometry.parameters?.depth !== depth
+      ) {
+        mesh.geometry.dispose();
+        mesh.geometry = new BoxGeometry(width, height, depth);
+      }
+      mesh.material.roughness = roughness;
+      mesh.material.metalness = metalness;
+      mesh.material.color.set(color);
+    }
+
+    mesh.visible = true;
+    return mesh;
+  }
+
+  function applySharedLayout(layout) {
+    if (!layout || typeof layout !== 'object') {
+      return;
+    }
+    const descriptorMap = new Map();
+    if (Array.isArray(layout.bodies)) {
+      layout.bodies.forEach((descriptor) => {
+        descriptorMap.set(descriptor.id, descriptor);
+        ensureSharedBodyMesh(descriptor);
+      });
+    }
+    const bodyIds = Array.isArray(layout.bodyIds)
+      ? layout.bodyIds
+      : Array.isArray(layout.bodies)
+      ? layout.bodies.map((descriptor) => descriptor.id)
+      : [];
+
+    sharedDescriptorMap = descriptorMap;
+    primaryBodyId = bodyIds[0] ?? primaryBodyId;
+
+    sharedBodyMeshes.forEach((mesh, id) => {
+      mesh.visible = descriptorMap.size === 0 ? mesh.visible : descriptorMap.has(id);
+    });
+  }
+
+  function setSharedStateBuffer(buffer, layout) {
+    if (!(buffer instanceof SharedArrayBuffer)) {
+      sharedState = null;
+      return;
+    }
+    const metaLength = layout?.metaLength ?? 0;
+    const floatsPerBody = layout?.floatsPerBody ?? 0;
+    const bodyCount = layout?.bodyCount ?? layout?.bodyIds?.length ?? 0;
+    if (!metaLength || !floatsPerBody || !bodyCount) {
+      sharedState = null;
+      return;
+    }
+    const metaBytes = metaLength * Int32Array.BYTES_PER_ELEMENT;
+    sharedState = {
+      meta: new Int32Array(buffer, 0, metaLength),
+      floats: new Float32Array(buffer, metaBytes, bodyCount * floatsPerBody),
+      layout,
+      floatsPerBody,
+      version: -1
+    };
+  }
+
+  function updateSharedTransforms() {
+    if (!sharedState) {
+      return;
+    }
+    const { meta, floats, layout, floatsPerBody } = sharedState;
+    const bodyIds = Array.isArray(layout.bodyIds)
+      ? layout.bodyIds
+      : Array.isArray(layout.bodies)
+      ? layout.bodies.map((descriptor) => descriptor.id)
+      : [];
+    if (!bodyIds.length || !floatsPerBody) {
+      return;
+    }
+    const versionIndex = layout.metaIndices?.version ?? META_DEFAULT_VERSION_INDEX;
+    const writeLockIndex = layout.metaIndices?.writeLock ?? META_DEFAULT_WRITE_LOCK_INDEX;
+    if (Atomics.load(meta, writeLockIndex) !== 0) {
+      return;
+    }
+    const version = Atomics.load(meta, versionIndex);
+    if (version === sharedState.version) {
+      return;
+    }
+    sharedState.version = version;
+    for (let index = 0; index < bodyIds.length; index += 1) {
+      const bodyId = bodyIds[index];
+      const mesh = sharedBodyMeshes.get(bodyId);
+      if (!mesh) {
+        continue;
+      }
+      const baseIndex = index * floatsPerBody;
+      const px = floats[baseIndex];
+      const py = floats[baseIndex + 1];
+      const pz = floats[baseIndex + 2];
+      const rx = floats[baseIndex + 3];
+      const ry = floats[baseIndex + 4];
+      const rz = floats[baseIndex + 5];
+      const rw = floats[baseIndex + 6];
+      if (Number.isFinite(px) && Number.isFinite(py) && Number.isFinite(pz)) {
+        mesh.position.set(px, py, pz);
+      }
+      if (
+        Number.isFinite(rx) &&
+        Number.isFinite(ry) &&
+        Number.isFinite(rz) &&
+        Number.isFinite(rw)
+      ) {
+        mesh.quaternion.set(rx, ry, rz, rw);
+      }
+      if (bodyId === primaryBodyId) {
+        lastPrimaryPosition.copy(mesh.position);
+      }
+    }
+    const now = performance.now();
+    if (now - logClock >= 500 && primaryBodyId) {
+      logClock = now;
+      const primaryMesh = sharedBodyMeshes.get(primaryBodyId);
+      if (primaryMesh) {
+        console.info('[Shared State] primary body height:', primaryMesh.position.y.toFixed(3));
+      }
+    }
+  }
+
+  function updateBodiesFromTick(bodies = []) {
+    bodies.forEach((bodyState) => {
+      if (!bodyState || typeof bodyState.id !== 'string') {
+        return;
+      }
+      let mesh = sharedBodyMeshes.get(bodyState.id);
+      if (!mesh) {
+        const descriptor = sharedDescriptorMap.get(bodyState.id) || {
+          id: bodyState.id,
+          halfExtents: [0.5, 0.5, 0.5],
+          material: {}
+        };
+        mesh = ensureSharedBodyMesh(descriptor);
+      }
+      if (!mesh) {
+        return;
+      }
+      if (bodyState.translation) {
+        mesh.position.set(
+          bodyState.translation.x,
+          bodyState.translation.y,
+          bodyState.translation.z
+        );
+        if (bodyState.id === primaryBodyId) {
+          lastPrimaryPosition.set(
+            bodyState.translation.x,
+            bodyState.translation.y,
+            bodyState.translation.z
+          );
+        }
+      }
+      if (bodyState.rotation) {
+        mesh.quaternion.set(
+          bodyState.rotation.x,
+          bodyState.rotation.y,
+          bodyState.rotation.z,
+          bodyState.rotation.w
+        );
+      }
+    });
+  }
+
+  function updateCamera(deltaSeconds) {
+    if (viewMode === 'follow' && primaryBodyId) {
+      controls.enabled = false;
+      const target = sharedBodyMeshes.get(primaryBodyId);
+      if (target) {
+        primaryLerpTarget.copy(target.position).add(LOOK_OFFSET);
+        const followPosition = target.position.clone().add(FOLLOW_OFFSET);
+        camera.position.lerp(followPosition, Math.min(1, deltaSeconds * 2.5));
+        camera.lookAt(primaryLerpTarget);
+        controls.target.lerp(primaryLerpTarget, Math.min(1, deltaSeconds * 2.5));
+      } else {
+        camera.lookAt(lastPrimaryPosition.clone().add(LOOK_OFFSET));
+      }
+    } else {
+      controls.enabled = true;
+      controls.update();
+    }
+  }
+
+  function renderFrame(timestamp) {
+    if (sharedState) {
+      updateSharedTransforms();
+    }
+    let deltaSeconds = 0;
+    if (lastFrameTimestamp !== null) {
+      deltaSeconds = (timestamp - lastFrameTimestamp) / 1000;
+      previewRoot.rotation.y += deltaSeconds * 0.35;
+      previewGroups.forEach((group, index) => {
+        group.rotation.y += deltaSeconds * (0.15 + (index % 5) * 0.05);
+      });
+    }
+    updateCamera(deltaSeconds);
+    lastFrameTimestamp = timestamp;
+    renderer.render(scene, camera);
+  }
+
+  renderer.setAnimationLoop(renderFrame);
+
+  function populateMorphPreview() {
+    previewRoot.clear();
+    previewGroups.length = 0;
+    const genomes = generateSampleMorphGenomes(12);
+    const columns = 4;
+    const spacing = 1.8;
+    const rows = Math.ceil(genomes.length / columns);
+    const offsetX = ((columns - 1) * spacing) / 2;
+    const offsetZ = ((rows - 1) * spacing) / 2;
+
+    genomes.forEach((genome, index) => {
+      const blueprint = buildMorphologyBlueprint(genome);
+      if (blueprint.errors.length > 0) {
+        console.warn('Preview blueprint validation failed:', blueprint.errors.join('; '));
+        return;
+      }
+      const materialMap = new Map(
+        Object.entries(blueprint.materials).map(([key, value]) => [key, value])
+      );
+      const group = new Group();
+      blueprint.bodies.forEach((body) => {
+        const halfExtents = body.halfExtents;
+        const geometry = new BoxGeometry(
+          halfExtents[0] * 2,
+          halfExtents[1] * 2,
+          halfExtents[2] * 2
+        );
+        const materialInfo = materialMap.get(body.materialId) || body.material || {};
+        const material = new MeshStandardMaterial({
+          color: materialInfo.color ?? '#38bdf8',
+          roughness: materialInfo.roughness ?? 0.38,
+          metalness: materialInfo.metalness ?? 0.18
+        });
+        const mesh = new Mesh(geometry, material);
+        mesh.position.set(
+          body.translation[0],
+          body.translation[1],
+          body.translation[2]
+        );
+        mesh.quaternion.set(
+          body.rotation[0],
+          body.rotation[1],
+          body.rotation[2],
+          body.rotation[3]
+        );
+        group.add(mesh);
+      });
+      previewBounds.setFromObject(group);
+      previewBounds.getCenter(previewCenter);
+      previewBounds.getSize(previewSize);
+      group.children.forEach((child) => {
+        child.position.sub(previewCenter);
+      });
+      const row = Math.floor(index / columns);
+      const col = index % columns;
+      group.position.set(
+        col * spacing - offsetX,
+        previewSize.y * 0.5,
+        row * spacing - offsetZ
+      );
+      previewRoot.add(group);
+      previewGroups.push(group);
+    });
+  }
+
+  populateMorphPreview();
+
+  return {
+    applySharedLayout,
+    setSharedStateBuffer,
+    clearSharedState() {
+      sharedState = null;
+    },
+    updateBodiesFromTick,
+    setViewMode(mode) {
+      viewMode = mode === 'follow' ? 'follow' : 'orbit';
+      if (viewMode === 'orbit') {
+        controls.enabled = true;
+      }
+    },
+    getViewMode() {
+      return viewMode;
+    },
+    isSharedStateActive() {
+      return Boolean(sharedState);
+    },
+    getPrimaryBodyPosition() {
+      return lastPrimaryPosition.clone();
+    }
+  };
+}

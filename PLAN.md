@@ -123,24 +123,27 @@
 ---
 
 ## Phase 5 — UI/UX (Pure HTML/CSS/JS + CDN)
-- [ ] **P5-01: Basic UI Panels**
+- [x] **P5-01: Basic UI Panels**
   - **Owner:** UI Agent
   - **Inputs:** HTML templates
   - **Outputs:** Start button, progress bar, stats area
   - **DoD:** Run starts/stops via button
   - **Dependencies:** P0-01
-- [ ] **P5-02: Creature Viewer**
+  - **Status:** Added a sidebar evolution panel with toggleable start/stop control, live generation counter, and a progress indicator wired to the deterministic demo run.
+- [x] **P5-02: Creature Viewer**
   - **Owner:** UI Agent
   - **Inputs:** Renderer linked to simulation
   - **Outputs:** Follow-cam, orbit controls
   - **DoD:** Best creature visible in focus mode
   - **Dependencies:** P2-03, P1-03
-- [ ] **P5-03: Config Controls**
+  - **Status:** Refactored viewer into a standalone module with orbit controls, a follow-camera mode, and shared memory driven pose updates.
+- [x] **P5-03: Config Controls**
   - **Owner:** UI Agent
   - **Inputs:** HTML forms
   - **Outputs:** Adjust mutation rates, pop size
   - **DoD:** Changes apply to next run
   - **Dependencies:** P4-01
+  - **Status:** Introduced configurable seed, population, and mutation number inputs whose values feed directly into the evolution engine via abortable runs.
 
 ---
 
