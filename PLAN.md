@@ -51,23 +51,26 @@
 ---
 
 ## Phase 2 — Genome & Morphology
-- [ ] **P2-01: Morph Genome Schema (Plain JSON)**
+- [x] **P2-01: Morph Genome Schema (Plain JSON)**
   - **Owner:** Evolution Agent
   - **Outputs:** `morphGenome.js` exporting simple schema
   - **DoD:** JSON validated with inline functions
   - **Dependencies:** P0-03
-- [ ] **P2-02: Instantiate Morphology → Physics Bodies**
+  - **Status:** Implemented reusable schema utilities with validation, blueprint building, and preview genome generator.
+- [x] **P2-02: Instantiate Morphology → Physics Bodies**
   - **Owner:** Physics Agent
   - **Inputs:** Genome JSON
   - **Outputs:** Function `spawnCreature(genome)` in worker
   - **DoD:** Simple 2-block creature appears in simulation
   - **Dependencies:** P1-02, P2-01
-- [ ] **P2-03: Morph Preview in Three.js**
+  - **Status:** Physics worker now derives rigid bodies and joints from the morph genome and streams poses via SharedArrayBuffer when available.
+- [x] **P2-03: Morph Preview in Three.js**
   - **Owner:** UI Agent
   - **Inputs:** Genome JSON
   - **Outputs:** Three.js Meshes representing blocks
   - **DoD:** Preview grid shows 10+ morphs at 60fps
   - **Dependencies:** P2-01, P0-02
+  - **Status:** Added animated preview grid showcasing multiple genome variants alongside the live hopper simulation.
 
 ---
 
