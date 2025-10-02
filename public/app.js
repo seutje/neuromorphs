@@ -3,6 +3,7 @@ import { createViewControls } from './ui/viewControls.js';
 import { createEvolutionPanel } from './ui/evolutionPanel.js';
 import { createGenerationViewer } from './ui/generationViewer.js';
 import { runEvolutionDemo } from './evolution/demo.js';
+import { createUpdateQueue } from './evolution/updateQueue.js';
 import {
   DEFAULT_SELECTION_WEIGHTS,
   objectiveToSelectionWeights,
@@ -62,6 +63,30 @@ const DEFAULT_MODEL_NAME = 'catdog';
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
+const DOM_UPDATE_INTERVAL_MS = 200;
+let statusTextCache = statusMessage?.textContent ?? '';
+const statusUpdateQueue = createUpdateQueue({
+  intervalMs: DOM_UPDATE_INTERVAL_MS,
+  flush: (messages) => {
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return;
+    }
+    const latest = messages[messages.length - 1];
+    const nextText =
+      typeof latest === 'string'
+        ? latest
+        : latest !== undefined && latest !== null
+          ? String(latest)
+          : '';
+    if (nextText === statusTextCache) {
+      return;
+    }
+    statusTextCache = nextText;
+    if (statusMessage) {
+      statusMessage.textContent = nextText;
+    }
+  }
+});
 
 let persistedRunState = loadRunState() ?? null;
 let latestReplay = loadReplayRecord() ?? null;
@@ -339,32 +364,75 @@ function buildGenerationViewerEntry(entry, absoluteGeneration) {
   };
 }
 
+function applyGenerationUpdateBatch(entries) {
+  if (!Array.isArray(entries) || entries.length === 0) {
+    return;
+  }
+
+  const totalGenerations = activeRunTotalGenerations || activeRunConfig?.generations || 1;
+  const viewerEntries = [];
+  let latestEntry = null;
+  let latestAbsoluteGeneration = 0;
+
+  entries.forEach((entry) => {
+    if (!entry) {
+      return;
+    }
+    const absoluteGeneration = Number.isFinite(entry.absoluteGeneration)
+      ? entry.absoluteGeneration
+      : Number(entry.generation ?? 0);
+
+    if (generationViewer) {
+      const viewerEntry = buildGenerationViewerEntry(entry, absoluteGeneration);
+      if (viewerEntry) {
+        viewerEntries.push(viewerEntry);
+      }
+    }
+
+    latestEntry = entry;
+    latestAbsoluteGeneration = absoluteGeneration;
+  });
+
+  if (!latestEntry) {
+    return;
+  }
+
+  if (generationViewer && viewerEntries.length > 0) {
+    viewerEntries.forEach((viewerEntry) => {
+      generationViewer.addGeneration(viewerEntry);
+    });
+  }
+
+  if (latestEntry.bestIndividual) {
+    setLatestBestIndividual(latestEntry.bestIndividual);
+  }
+
+  if (!evolutionPanel) {
+    return;
+  }
+
+  const total = totalGenerations > 0 ? totalGenerations : 1;
+  evolutionPanel.updateProgress({
+    generation: Math.min(total, latestAbsoluteGeneration + 1),
+    total
+  });
+  evolutionPanel.updateStats({
+    generation: latestAbsoluteGeneration + 1,
+    bestFitness: latestEntry.bestFitness,
+    meanFitness: latestEntry.meanFitness
+  });
+}
+
+const generationUpdateQueue = createUpdateQueue({
+  intervalMs: DOM_UPDATE_INTERVAL_MS,
+  flush: applyGenerationUpdateBatch
+});
+
 function handleGenerationUpdate(entry) {
   if (!entry) {
     return;
   }
-  if (entry.bestIndividual) {
-    setLatestBestIndividual(entry.bestIndividual);
-  }
-  const total = activeRunTotalGenerations || activeRunConfig?.generations || 1;
-  const absoluteGeneration = Number.isFinite(entry.absoluteGeneration)
-    ? entry.absoluteGeneration
-    : Number(entry.generation ?? 0);
-  evolutionPanel.updateProgress({
-    generation: Math.min(total, absoluteGeneration + 1),
-    total
-  });
-  evolutionPanel.updateStats({
-    generation: absoluteGeneration + 1,
-    bestFitness: entry.bestFitness,
-    meanFitness: entry.meanFitness
-  });
-  if (generationViewer) {
-    const viewerEntry = buildGenerationViewerEntry(entry, absoluteGeneration);
-    if (viewerEntry) {
-      generationViewer.addGeneration(viewerEntry);
-    }
-  }
+  generationUpdateQueue.push(entry);
 }
 
 function persistSnapshot(snapshot) {
@@ -390,6 +458,7 @@ function handleRunComplete(result) {
   if (!activeRunConfig || !result) {
     return;
   }
+  generationUpdateQueue.flush({ force: true });
   if (result.best) {
     setLatestBestIndividual(result.best);
   }
@@ -486,6 +555,7 @@ async function executeEvolutionRun({ config, resumeState = null, resetStats = tr
   }
   activeRunConfig = deepClone(config);
   activeRunTotalGenerations = config.generations;
+  generationUpdateQueue.cancel();
   applyStageFromConfig(config, { announce: false });
   const selectionWeights = resolveSelectionWeights(
     config.selectionWeights ??
@@ -563,6 +633,8 @@ async function executeEvolutionRun({ config, resumeState = null, resetStats = tr
       updateStatus('Evolution run failed — check the console for details.');
     }
   } finally {
+    generationUpdateQueue.flush({ force: true });
+    generationUpdateQueue.cancel();
     evolutionPanel.setRunning(false);
     generationViewer?.setRunning(false);
     generationViewer?.stopPlayback();
@@ -780,9 +852,11 @@ if (resetAllButton) {
 }
 
 function updateStatus(message) {
-  if (statusMessage) {
-    statusMessage.textContent = message;
+  const value = message === undefined || message === null ? '' : String(message);
+  if (value === statusTextCache) {
+    return;
   }
+  statusUpdateQueue.push(value);
 }
 
 function handleResetAllClick() {
@@ -797,6 +871,7 @@ function handleResetAllClick() {
     console.warn('Failed to clear localStorage during reset.', error);
   }
   updateStatus('All saved data cleared. Reloading…');
+  statusUpdateQueue.flush({ force: true });
   window.location.reload();
 }
 
