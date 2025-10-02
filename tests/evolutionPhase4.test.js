@@ -53,6 +53,22 @@ describe('simulateLocomotion', () => {
       longRun.trace[longRun.trace.length - 1].timestamp
     );
   });
+
+  it('simulates locomotion in the obstacle stage without errors', async () => {
+    const morph = createDefaultMorphGenome();
+    const controller = createDefaultControllerGenome();
+
+    const result = await simulateLocomotion({
+      morphGenome: morph,
+      controllerGenome: controller,
+      duration: 0.8,
+      sampleInterval: 1 / 30,
+      stageId: 'obstacle'
+    });
+
+    expect(result.trace.length).toBeGreaterThan(0);
+    expect(result.runtime).toBeGreaterThan(0);
+  });
 });
 
 describe('morph genome mutations', () => {

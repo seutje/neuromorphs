@@ -73,6 +73,10 @@ h2 {
   align-items: center;
 }
 
+.viewer-controls button {
+  align-self: center;
+}
+
 .control-label {
   font-size: 0.85rem;
   color: rgba(226, 232, 240, 0.7);
@@ -86,6 +90,10 @@ h2 {
   background: rgba(15, 23, 42, 0.8);
   color: inherit;
   font-weight: 500;
+}
+
+.stage-select {
+  min-width: 8rem;
 }
 
 #viewport {
