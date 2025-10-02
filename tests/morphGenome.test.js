@@ -124,6 +124,19 @@ describe('buildMorphologyBlueprint', () => {
     });
   });
 
+  it('propagates disableContacts flags to the blueprint joints', () => {
+    const genome = createDefaultMorphGenome();
+    delete genome.bodies[1].joint.disableContacts;
+
+    const baseline = buildMorphologyBlueprint(genome);
+    expect(baseline.joints[0]).toMatchObject({ disableContacts: false });
+
+    genome.bodies[1].joint.disableContacts = true;
+
+    const toggled = buildMorphologyBlueprint(genome);
+    expect(toggled.joints[0]).toMatchObject({ disableContacts: true });
+  });
+
   it('surfaces validation errors for malformed genomes', () => {
     const malformed = { version: '0.1.0', bodies: [] };
 

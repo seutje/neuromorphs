@@ -13,6 +13,7 @@ import {
   decodeReplayBuffer,
   createReplayPlayback
 } from './replayRecorder.js';
+import { shouldEnableJointContacts } from './jointUtils.js';
 import {
   ARENA_FLOOR_Y,
   ARENA_HALF_EXTENTS,
@@ -568,9 +569,6 @@ function instantiateCreature(morphGenome, controllerGenome, options = {}) {
       jointData = RAPIER.JointData.revolute(parentAnchor, childAnchor, axis);
     }
     const jointHandle = world.createImpulseJoint(jointData, parentEntry.body, childEntry.body, true);
-    if (typeof jointHandle?.setContactsEnabled === 'function') {
-      jointHandle.setContactsEnabled(false);
-    }
     if (jointDef.limits) {
       try {
         jointHandle.setLimits(jointDef.limits[0], jointDef.limits[1]);
@@ -578,15 +576,19 @@ function instantiateCreature(morphGenome, controllerGenome, options = {}) {
         console.warn('Failed to apply joint limits:', error);
       }
     }
-    creatureJoints.push(jointHandle);
     const descriptor = {
       id: isAdditional ? `${prefixBase}${jointDef.id}` : jointDef.id,
       parentId,
       childId,
       axis: [...jointDef.axis],
       limits: jointDef.limits ? [...jointDef.limits] : null,
+      disableContacts: Boolean(jointDef.disableContacts),
       handle: jointHandle
     };
+    if (typeof jointHandle?.setContactsEnabled === 'function') {
+      jointHandle.setContactsEnabled(shouldEnableJointContacts(descriptor));
+    }
+    creatureJoints.push(jointHandle);
     creatureJointDescriptors.push(descriptor);
     creatureJointMap.set(descriptor.id, descriptor);
   });
