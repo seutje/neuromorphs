@@ -117,7 +117,7 @@ function computeInstanceOffset(index) {
   const spacing = 3;
   const step = Math.floor(index / 2) + 1;
   const direction = index % 2 === 0 ? 1 : -1;
-  return { x: direction * step * spacing, y: 0, z: 0 };
+  return { x: 0, y: 0, z: direction * step * spacing };
 }
 
 function cloneControllerBlueprintForInstance(blueprint, prefix) {
