@@ -6,10 +6,10 @@ import { createGenerationViewer } from '../public/ui/generationViewer.js';
 
 function setupDom() {
   document.body.innerHTML = `
-    <section id="generation-viewer" class="generation-viewer is-empty">
-      <header class="generation-viewer__header">
+    <fieldset id="generation-viewer" class="generation-viewer is-empty">
+      <legend class="generation-viewer__legend">Generation Viewer</legend>
+      <div class="generation-viewer__header">
         <div>
-          <h3>Generation Viewer</h3>
           <p class="generation-viewer__subtitle">Testing</p>
         </div>
         <div class="generation-viewer__actions">
@@ -25,7 +25,7 @@ function setupDom() {
             Latest
           </button>
         </div>
-      </header>
+      </div>
       <label for="generation-slider" class="generation-viewer__label">Scrub</label>
       <input
         id="generation-slider"
@@ -57,7 +57,7 @@ function setupDom() {
       </div>
       <ol id="generation-timeline" class="generation-timeline"></ol>
       <p class="generation-viewer__empty">Empty</p>
-    </section>
+    </fieldset>
   `;
 
   const container = document.querySelector('#generation-viewer');
