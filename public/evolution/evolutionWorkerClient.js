@@ -1,3 +1,8 @@
+import {
+  DEFAULT_SELECTION_WEIGHTS,
+  resolveSelectionWeights
+} from './fitness.js';
+
 let workerInstance = null;
 let runCounter = 0;
 const pendingRuns = new Map();
@@ -101,7 +106,7 @@ export function runEvolutionInWorker({
   seed,
   startGeneration = 0,
   history = [],
-  selectionObjective = 'distance',
+  selectionWeights = DEFAULT_SELECTION_WEIGHTS,
   simulation,
   onGeneration,
   onStateSnapshot,
@@ -136,6 +141,8 @@ export function runEvolutionInWorker({
       signal.addEventListener('abort', abortHandler);
     }
 
+    const weights = resolveSelectionWeights(selectionWeights);
+
     worker.postMessage({
       type: 'start',
       id: runId,
@@ -149,7 +156,7 @@ export function runEvolutionInWorker({
         rngState,
         startGeneration,
         history,
-        selectionObjective,
+        selectionWeights: weights,
         simulation
       }
     });

@@ -4,6 +4,11 @@ import { createEvolutionPanel } from './ui/evolutionPanel.js';
 import { createGenerationViewer } from './ui/generationViewer.js';
 import { runEvolutionDemo } from './evolution/demo.js';
 import {
+  DEFAULT_SELECTION_WEIGHTS,
+  objectiveToSelectionWeights,
+  resolveSelectionWeights
+} from './evolution/fitness.js';
+import {
   saveRunState,
   loadRunState,
   clearRunState,
@@ -102,11 +107,13 @@ function applyConfigToForm(config) {
   assign('controllerWeightChance', config.controllerMutation?.weightJitterChance ?? 0.85);
   assign('controllerOscillatorChance', config.controllerMutation?.oscillatorChance ?? 0.6);
   assign('controllerAddConnectionChance', config.controllerMutation?.addConnectionChance ?? 0.45);
-  const selectionObjective =
-    config.selectionObjective === 'speed' || config.selectionObjective === 'upright'
-      ? config.selectionObjective
-      : 'distance';
-  assign('selectionObjective', selectionObjective);
+  const legacyObjectiveWeights = config.selectionObjective
+    ? objectiveToSelectionWeights(config.selectionObjective)
+    : null;
+  const weights = resolveSelectionWeights(config.selectionWeights ?? legacyObjectiveWeights);
+  assign('selectionWeightDistance', weights.distance);
+  assign('selectionWeightSpeed', weights.speed);
+  assign('selectionWeightUpright', weights.upright);
 }
 
 function resolveBestMetrics(entry) {
@@ -277,6 +284,12 @@ async function executeEvolutionRun({ config, resumeState = null, resetStats = tr
   }
   activeRunConfig = deepClone(config);
   activeRunTotalGenerations = config.generations;
+  const selectionWeights = resolveSelectionWeights(
+    config.selectionWeights ??
+      (config.selectionObjective
+        ? objectiveToSelectionWeights(config.selectionObjective)
+        : DEFAULT_SELECTION_WEIGHTS)
+  );
   if (!resumeState) {
     clearRunState();
     persistedRunState = null;
@@ -307,10 +320,7 @@ async function executeEvolutionRun({ config, resumeState = null, resetStats = tr
         morph: config.morphMutation,
         controller: config.controllerMutation
       },
-      selectionObjective:
-        config.selectionObjective === 'speed' || config.selectionObjective === 'upright'
-          ? config.selectionObjective
-          : 'distance',
+      selectionWeights,
       resume: resumeState,
       signal: controller.signal,
       onGeneration: (entry) => {

@@ -3,6 +3,11 @@ import { createDefaultControllerGenome } from '../../genomes/ctrlGenome.js';
 import { createRng, splitRng } from './rng.js';
 import { mutateMorphGenome, mutateControllerGenome } from './mutation.js';
 import { runEvolutionInWorker } from './evolutionWorkerClient.js';
+import {
+  DEFAULT_SELECTION_WEIGHTS,
+  objectiveToSelectionWeights,
+  resolveSelectionWeights
+} from './fitness.js';
 
 function cloneValue(value) {
   return JSON.parse(JSON.stringify(value));
@@ -51,6 +56,7 @@ export async function runEvolutionDemo(options = {}) {
     resume,
     logger = console,
     selectionObjective = 'distance',
+    selectionWeights = DEFAULT_SELECTION_WEIGHTS,
     simulationDuration = 60,
     simulationTimestep = 1 / 60,
     simulationSampleInterval = 1 / 30
@@ -119,6 +125,10 @@ export async function runEvolutionDemo(options = {}) {
 
   const rngState = typeof rng.serialize === 'function' ? rng.serialize() : null;
 
+  const resolvedSelectionWeights = resolveSelectionWeights(
+    selectionWeights ?? objectiveToSelectionWeights(selectionObjective)
+  );
+
   const result = await runEvolutionInWorker({
     initialPopulation,
     generations: remainingGenerations,
@@ -132,7 +142,7 @@ export async function runEvolutionDemo(options = {}) {
     onStateSnapshot,
     startGeneration: resumeGeneration,
     history: resumeHistory,
-    selectionObjective,
+    selectionWeights: resolvedSelectionWeights,
     simulation: {
       duration: simulationDuration,
       timestep: simulationTimestep,

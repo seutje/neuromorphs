@@ -145,13 +145,43 @@
               <div class="run-controls">
                 <button id="evolution-start" type="button">Start Evolution</button>
                 <button id="preview-best" type="button" disabled>Preview Best</button>
-                <div class="run-controls__objective">
-                  <label for="config-selection-objective">Select for</label>
-                  <select id="config-selection-objective" name="selectionObjective">
-                    <option value="distance" selected>Distance</option>
-                    <option value="speed">Speed</option>
-                    <option value="upright">Upright</option>
-                  </select>
+                <div class="run-controls__weights">
+                  <span class="run-controls__weights-label">Fitness weights</span>
+                  <div class="run-controls__weights-grid">
+                    <div class="run-controls__weight">
+                      <label for="config-weight-distance">Distance</label>
+                      <input
+                        id="config-weight-distance"
+                        name="selectionWeightDistance"
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value="0.5"
+                      />
+                    </div>
+                    <div class="run-controls__weight">
+                      <label for="config-weight-speed">Speed</label>
+                      <input
+                        id="config-weight-speed"
+                        name="selectionWeightSpeed"
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value="1"
+                      />
+                    </div>
+                    <div class="run-controls__weight">
+                      <label for="config-weight-upright">Upright</label>
+                      <input
+                        id="config-weight-upright"
+                        name="selectionWeightUpright"
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value="1"
+                      />
+                    </div>
+                  </div>
                 </div>
                 <progress
                   id="evolution-progress"

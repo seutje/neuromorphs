@@ -1,3 +1,5 @@
+import { DEFAULT_SELECTION_WEIGHTS, resolveSelectionWeights } from '../evolution/fitness.js';
+
 function clamp01(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) {
@@ -16,12 +18,12 @@ function parseFloatValue(value, fallback) {
   return Number.isFinite(number) ? number : fallback;
 }
 
-function parseSelectionObjective(value) {
-  const normalized = typeof value === 'string' ? value.toLowerCase() : '';
-  if (normalized === 'speed' || normalized === 'upright') {
-    return normalized;
+function parseWeight(value, fallback) {
+  const number = Number.parseFloat(value);
+  if (!Number.isFinite(number)) {
+    return Math.max(fallback, 0);
   }
-  return 'distance';
+  return Math.max(number, 0);
 }
 
 export function createEvolutionPanel({
@@ -65,7 +67,20 @@ export function createEvolutionPanel({
       seed: parseInteger(form.seed?.value, 42),
       populationSize: Math.max(4, parseInteger(form.populationSize?.value, 12)),
       generations: Math.max(1, parseInteger(form.generations?.value, 10)),
-      selectionObjective: parseSelectionObjective(form.selectionObjective?.value),
+      selectionWeights: resolveSelectionWeights({
+        distance: parseWeight(
+          form.selectionWeightDistance?.value,
+          DEFAULT_SELECTION_WEIGHTS.distance
+        ),
+        speed: parseWeight(
+          form.selectionWeightSpeed?.value,
+          DEFAULT_SELECTION_WEIGHTS.speed
+        ),
+        upright: parseWeight(
+          form.selectionWeightUpright?.value,
+          DEFAULT_SELECTION_WEIGHTS.upright
+        )
+      }),
       morphMutation: {
         addLimbChance: clamp01(parseFloatValue(form.morphAddLimbChance?.value, 0.35)),
         resizeChance: clamp01(parseFloatValue(form.morphResizeChance?.value, 0.85)),
