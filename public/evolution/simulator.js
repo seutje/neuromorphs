@@ -18,7 +18,7 @@ function recordSample(instance, trace, timestamp, sensors) {
 export async function simulateLocomotion({
   morphGenome,
   controllerGenome,
-  duration = 2.5,
+  duration = 60,
   timestep = 1 / 60,
   sampleInterval = 1 / 30,
   signal
