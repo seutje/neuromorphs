@@ -52,7 +52,7 @@ export async function runEvolutionDemo(options = {}) {
     onStateSnapshot,
     resume,
     logger = console,
-    simulationDuration = 2.5,
+    simulationDuration = 60,
     simulationTimestep = 1 / 60,
     simulationSampleInterval = 1 / 30
   } = options;
