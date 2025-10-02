@@ -436,6 +436,33 @@ if (modelLibraryContainer) {
       message: `Loaded model "${record.name}". Previewing in physics viewer…`
     });
   });
+  modelLibrary.onExport((id) => {
+    const record = savedModelRecords.find((entry) => entry.id === id) ?? loadModelRecord(id);
+    if (!record) {
+      updateStatus('Unable to export the selected model.');
+      return;
+    }
+    const payload = {
+      id: record.id,
+      name: record.name,
+      createdAt: record.createdAt ?? null,
+      updatedAt: record.updatedAt ?? null,
+      config: record.config ?? null,
+      individual: record.individual ?? null
+    };
+    const json = JSON.stringify(payload, null, 2);
+    copyTextToClipboard(json)
+      .then((success) => {
+        if (success) {
+          updateStatus('Model copied to clipboard');
+        } else {
+          updateStatus('Unable to copy model to clipboard.');
+        }
+      })
+      .catch(() => {
+        updateStatus('Unable to copy model to clipboard.');
+      });
+  });
   modelLibrary.onDelete((id) => {
     const record = savedModelRecords.find((entry) => entry.id === id) ?? loadModelRecord(id);
     const label = record?.name ?? 'saved model';
@@ -505,6 +532,44 @@ function updateStatus(message) {
   if (statusMessage) {
     statusMessage.textContent = message;
   }
+}
+
+function copyTextToClipboard(text) {
+  if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard
+      .writeText(text)
+      .then(() => true)
+      .catch(() => false);
+  }
+  if (typeof document === 'undefined') {
+    return Promise.resolve(false);
+  }
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'absolute';
+  textarea.style.left = '-9999px';
+  document.body.append(textarea);
+  const selection = document.getSelection();
+  let originalRange = null;
+  if (selection && selection.rangeCount > 0) {
+    originalRange = selection.getRangeAt(0);
+  }
+  textarea.select();
+  let successful = false;
+  try {
+    successful = document.execCommand('copy');
+  } catch (_error) {
+    successful = false;
+  }
+  if (selection) {
+    selection.removeAllRanges();
+    if (originalRange) {
+      selection.addRange(originalRange);
+    }
+  }
+  textarea.remove();
+  return Promise.resolve(successful);
 }
 
 function setPhysicsRunning(next) {
