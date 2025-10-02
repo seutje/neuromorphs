@@ -135,6 +135,20 @@ h2 {
   gap: 0.5rem;
 }
 
+.evolution-panel__title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.evolution-panel__title-row h2 {
+  margin: 0;
+}
+
+.evolution-panel__title-row button {
+  margin-left: auto;
+}
+
 .panel-description {
   margin: 0;
   color: rgba(226, 232, 240, 0.75);

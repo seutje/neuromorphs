@@ -31,6 +31,7 @@ const simulationToggleButton = document.querySelector('#simulation-toggle');
 const stageSelect = document.querySelector('#stage-select');
 const loadStageButton = document.querySelector('#load-stage');
 const clearStageButton = document.querySelector('#clear-stage');
+const resetAllButton = document.querySelector('#reset-all');
 const evolutionForm = document.querySelector('#evolution-config');
 const evolutionStartButton = document.querySelector('#evolution-start');
 const previewBestButton = document.querySelector('#preview-best');
@@ -774,10 +775,29 @@ if (previewBestButton) {
   });
 }
 
+if (resetAllButton) {
+  resetAllButton.addEventListener('click', handleResetAllClick);
+}
+
 function updateStatus(message) {
   if (statusMessage) {
     statusMessage.textContent = message;
   }
+}
+
+function handleResetAllClick() {
+  const message =
+    'Reset all saved data and reload the page? This clears local storage for Neuromorphs.';
+  if (!window.confirm(message)) {
+    return;
+  }
+  try {
+    localStorage.clear();
+  } catch (error) {
+    console.warn('Failed to clear localStorage during reset.', error);
+  }
+  updateStatus('All saved data cleared. Reloading…');
+  window.location.reload();
 }
 
 function copyTextToClipboard(text) {
