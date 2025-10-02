@@ -146,12 +146,8 @@ h2 {
   gap: 1rem;
 }
 
-.config-column--actions {
-  gap: 1.25rem;
-}
-
-.evolution-panel #generation-viewer {
-  grid-column: 1 / -1;
+.config-form #generation-viewer {
+  align-self: stretch;
 }
 
 @media (max-width: 1200px) {
@@ -161,7 +157,7 @@ h2 {
   .config-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .config-column--actions {
+  .config-form #generation-viewer {
     grid-column: 1 / -1;
   }
 }
@@ -205,6 +201,23 @@ h2 {
   background: rgba(15, 23, 42, 0.75);
   color: inherit;
   font-weight: 500;
+}
+
+.run-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.35);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.run-summary__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: rgba(226, 232, 240, 0.85);
 }
 
 .run-controls {
