@@ -2,9 +2,7 @@ import { createDefaultMorphGenome } from '../../genomes/morphGenome.js';
 import { createDefaultControllerGenome } from '../../genomes/ctrlGenome.js';
 import { createRng, splitRng } from './rng.js';
 import { mutateMorphGenome, mutateControllerGenome } from './mutation.js';
-import { computeLocomotionFitness } from './fitness.js';
-import { runEvolution } from './evolutionEngine.js';
-import { simulateLocomotion } from './simulator.js';
+import { runEvolutionInWorker } from './evolutionWorkerClient.js';
 
 function cloneValue(value) {
   return JSON.parse(JSON.stringify(value));
@@ -112,37 +110,25 @@ export async function runEvolutionDemo(options = {}) {
     return result;
   }
 
-  const result = await runEvolution({
+  const rngState = typeof rng.serialize === 'function' ? rng.serialize() : null;
+
+  const result = await runEvolutionInWorker({
     initialPopulation,
     generations: remainingGenerations,
     elitism,
     tournamentSize,
-    rng,
     mutationConfig,
+    rngState,
+    seed,
     signal,
-    logger,
     onGeneration,
     onStateSnapshot,
     startGeneration: resumeGeneration,
     history: resumeHistory,
-    evaluate: async (individual) => {
-      const simulation = await simulateLocomotion({
-        morphGenome: individual.morph,
-        controllerGenome: individual.controller,
-        duration: simulationDuration,
-        timestep: simulationTimestep,
-        sampleInterval: simulationSampleInterval,
-        signal
-      });
-      const metrics = computeLocomotionFitness(simulation.trace);
-      return {
-        fitness: metrics.fitness,
-        metrics,
-        extras: {
-          trace: simulation.trace,
-          runtime: simulation.runtime
-        }
-      };
+    simulation: {
+      duration: simulationDuration,
+      timestep: simulationTimestep,
+      sampleInterval: simulationSampleInterval
     }
   });
 
