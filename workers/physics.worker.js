@@ -499,6 +499,7 @@ function instantiateCreature(morphGenome, controllerGenome, options = {}) {
 
   descriptors.forEach((descriptor) => {
     const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
+      .setCcdEnabled(true)
       .setTranslation(descriptor.translation[0], descriptor.translation[1], descriptor.translation[2])
       .setRotation({
         x: descriptor.rotation[0],
