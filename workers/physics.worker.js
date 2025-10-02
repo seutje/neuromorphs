@@ -1036,7 +1036,9 @@ self.addEventListener('message', (event) => {
       return;
     }
     if (hadBodies) {
-      resetCreature();
+      clearCreature();
+      configureSharedState([], {});
+      syncSharedState();
     }
     if (wasRunning && ready) {
       setRunning(true);
