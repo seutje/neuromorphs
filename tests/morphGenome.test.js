@@ -104,7 +104,8 @@ describe('buildMorphologyBlueprint', () => {
       expect.objectContaining({
         id: 'torso__leg',
         parentId: 'torso',
-        childId: 'leg'
+        childId: 'leg',
+        contactsEnabled: true
       })
     ]);
     const torso = blueprint.bodies.find((body) => body.id === 'torso');
@@ -133,6 +134,20 @@ describe('buildMorphologyBlueprint', () => {
     expect(blueprint.bodies).toHaveLength(0);
     expect(blueprint.joints).toHaveLength(0);
     expect(blueprint.materials).toEqual({});
+  });
+
+  it('allows genomes to request joint contact suppression', () => {
+    const genome = createDefaultMorphGenome();
+    genome.bodies[1].joint.contactsEnabled = false;
+
+    const blueprint = buildMorphologyBlueprint(genome);
+
+    expect(blueprint.joints).toEqual([
+      expect.objectContaining({
+        id: 'torso__leg',
+        contactsEnabled: false
+      })
+    ]);
   });
 });
 

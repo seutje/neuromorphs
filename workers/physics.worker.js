@@ -568,8 +568,9 @@ function instantiateCreature(morphGenome, controllerGenome, options = {}) {
       jointData = RAPIER.JointData.revolute(parentAnchor, childAnchor, axis);
     }
     const jointHandle = world.createImpulseJoint(jointData, parentEntry.body, childEntry.body, true);
+    const contactsEnabled = jointDef.contactsEnabled !== false;
     if (typeof jointHandle?.setContactsEnabled === 'function') {
-      jointHandle.setContactsEnabled(false);
+      jointHandle.setContactsEnabled(contactsEnabled);
     }
     if (jointDef.limits) {
       try {
@@ -584,6 +585,7 @@ function instantiateCreature(morphGenome, controllerGenome, options = {}) {
       parentId,
       childId,
       axis: [...jointDef.axis],
+      contactsEnabled,
       limits: jointDef.limits ? [...jointDef.limits] : null,
       handle: jointHandle
     };
