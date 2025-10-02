@@ -54,11 +54,11 @@ export function createViewer(canvas) {
   canvas.addEventListener(
     'wheel',
     (event) => {
-      if (event.ctrlKey) {
+      const allowZoom = event.ctrlKey;
+      controls.enableZoom = allowZoom;
+      if (allowZoom) {
         event.preventDefault();
-        return;
       }
-      controls.enableZoom = false;
       const restoreZoom = () => {
         controls.enableZoom = true;
       };
@@ -68,7 +68,7 @@ export function createViewer(canvas) {
         Promise.resolve().then(restoreZoom);
       }
     },
-    { passive: false }
+    { passive: false, capture: true }
   );
 
   const ambient = new AmbientLight('#e2e8f0', 0.6);
