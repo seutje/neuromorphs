@@ -23,10 +23,19 @@ export function createModelLibrary({ container } = {}) {
   const saveButton = container.querySelector('[data-model-save]');
   const list = container.querySelector('[data-model-list]');
   const loadButton = container.querySelector('[data-model-load]');
+  const exportButton = container.querySelector('[data-model-export]');
   const deleteButton = container.querySelector('[data-model-delete]');
   const emptyState = container.querySelector('[data-model-empty]');
 
-  if (!nameInput || !saveButton || !list || !loadButton || !deleteButton || !emptyState) {
+  if (
+    !nameInput ||
+    !saveButton ||
+    !list ||
+    !loadButton ||
+    !exportButton ||
+    !deleteButton ||
+    !emptyState
+  ) {
     throw new Error('createModelLibrary requires name input, buttons, list, and empty state elements.');
   }
 
@@ -37,6 +46,7 @@ export function createModelLibrary({ container } = {}) {
   const saveListeners = new Set();
   const loadListeners = new Set();
   const deleteListeners = new Set();
+  const exportListeners = new Set();
   const selectListeners = new Set();
 
   function updateSaveButton() {
@@ -49,6 +59,7 @@ export function createModelLibrary({ container } = {}) {
     selectedId = selectedOption ? selectedOption.value : null;
     const hasSelection = Boolean(selectedId);
     loadButton.disabled = !hasSelection;
+    exportButton.disabled = !hasSelection;
     deleteButton.disabled = !hasSelection;
     if (selectedOption) {
       selectListeners.forEach((listener) => listener(selectedId));
@@ -113,6 +124,13 @@ export function createModelLibrary({ container } = {}) {
     loadListeners.forEach((listener) => listener(selectedId));
   });
 
+  exportButton.addEventListener('click', () => {
+    if (!selectedId) {
+      return;
+    }
+    exportListeners.forEach((listener) => listener(selectedId));
+  });
+
   deleteButton.addEventListener('click', () => {
     if (!selectedId) {
       return;
@@ -141,6 +159,12 @@ export function createModelLibrary({ container } = {}) {
         deleteListeners.add(callback);
       }
       return () => deleteListeners.delete(callback);
+    },
+    onExport(callback = noop) {
+      if (typeof callback === 'function') {
+        exportListeners.add(callback);
+      }
+      return () => exportListeners.delete(callback);
     },
     onSelect(callback = noop) {
       if (typeof callback === 'function') {
