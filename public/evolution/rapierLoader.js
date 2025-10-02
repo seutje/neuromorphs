@@ -3,13 +3,20 @@ const RAPIER_CDN_URL =
 
 let rapierPromise = null;
 
+function isNodeEnvironment() {
+  const nodeProcess = globalThis?.process;
+  return (
+    Boolean(nodeProcess?.versions?.node) &&
+    nodeProcess.release?.name === 'node'
+  );
+}
+
 export async function loadRapier() {
   if (!rapierPromise) {
     rapierPromise = (async () => {
-      const module =
-        typeof window === 'undefined'
-          ? await import('@dimforge/rapier3d-compat')
-          : await import(RAPIER_CDN_URL);
+      const module = isNodeEnvironment()
+        ? await import('@dimforge/rapier3d-compat')
+        : await import(RAPIER_CDN_URL);
       const rapier = module?.default ?? module;
       if (!rapier) {
         throw new Error('Failed to load Rapier physics module.');
