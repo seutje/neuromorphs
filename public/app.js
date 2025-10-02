@@ -485,23 +485,29 @@ if (modelLibraryContainer) {
     modelLibrary.clearName();
     updateStatus(`Saved model "${record.name}".`);
   });
-  modelLibrary.onLoad((id) => {
+  modelLibrary.onAdd((id) => {
     const record = loadModelRecord(id);
     if (!record) {
-      updateStatus('Unable to load the selected model.');
+      updateStatus('Unable to add the selected model.');
       return;
-    }
-    setLatestBestIndividual(record.individual);
-    if (record.config) {
-      applyConfigToForm(record.config);
-      applyStageFromConfig(record.config, { announce: false });
     }
     savedModelRecords = listModelRecords();
     modelLibrary.setModels(savedModelRecords);
     modelLibrary.setSelectedId(id);
-    previewIndividual(record.individual, {
-      message: `Loaded model "${record.name}". Previewing in physics viewer…`
+    const clone = deepClone(record.individual);
+    if (!clone) {
+      updateStatus('Unable to prepare the selected model for adding.');
+      return;
+    }
+    if (!physicsWorker || !workerReady) {
+      updateStatus('Physics worker is not ready yet.');
+      return;
+    }
+    physicsWorker.postMessage({
+      type: 'add-individual',
+      individual: clone
     });
+    updateStatus(`Added model "${record.name}" to the scene.`);
   });
   modelLibrary.onExport((id) => {
     const record = savedModelRecords.find((entry) => entry.id === id) ?? loadModelRecord(id);
