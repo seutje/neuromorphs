@@ -833,17 +833,13 @@ async function initializeWorld() {
 
     applyStageToWorld(requestedStageId);
 
-    const defaultMorph = createDefaultMorphGenome();
-    const defaultController = createDefaultControllerGenome();
-    const spawned = instantiateCreature(defaultMorph, defaultController);
-    if (!spawned) {
-      throw new Error('Default morph failed to spawn.');
-    }
+    configureSharedState([], {});
+    syncSharedState();
 
     ready = true;
     postMessage({
       type: 'ready',
-      message: 'Rapier worker ready. Default morph spawned.'
+      message: 'Rapier worker ready. Awaiting creature spawn.'
     });
 
     if (pendingStart) {
@@ -1041,10 +1037,6 @@ self.addEventListener('message', (event) => {
     }
     if (hadBodies) {
       resetCreature();
-    } else if (ready) {
-      const defaultMorph = createDefaultMorphGenome();
-      const defaultController = createDefaultControllerGenome();
-      instantiateCreature(defaultMorph, defaultController);
     }
     if (wasRunning && ready) {
       setRunning(true);
@@ -1080,9 +1072,10 @@ self.addEventListener('message', (event) => {
     if (wasRunning) {
       setRunning(false);
     }
+    const hasExisting = creatureBodies.size > 0;
     const spawned = instantiateCreature(individual?.morph, individual?.controller, {
-      clearExisting: false,
-      prefixIds: true
+      clearExisting: !hasExisting,
+      prefixIds: hasExisting
     });
     if (!spawned) {
       postMessage({ type: 'error', message: 'Failed to add the requested individual.' });

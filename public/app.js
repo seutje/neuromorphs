@@ -56,6 +56,8 @@ const generationSummaryNodes = {
 };
 const modelLibraryContainer = document.querySelector('#model-library');
 const DEFAULT_MODEL_URL = new URL('../models/catdog.json', import.meta.url);
+const DEFAULT_MODEL_ID = '9ca351f8-e466-414f-89e4-de08bd771d9b';
+const DEFAULT_MODEL_NAME = 'catdog';
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -68,8 +70,9 @@ let activeRunTotalGenerations = 0;
 let generationViewer = null;
 let modelLibrary = null;
 let savedModelRecords = listModelRecords();
-let pendingDefaultModelRecord = null;
-let defaultModelRecordId = null;
+let pendingDefaultModelRecord = resolveDefaultModelRecord(savedModelRecords);
+let defaultModelRecordId = pendingDefaultModelRecord?.id ?? null;
+let defaultModelSpawnedForStage = false;
 let activeStageId = DEFAULT_STAGE_ID;
 let queuedStageId = DEFAULT_STAGE_ID;
 let workerReady = false;
@@ -90,7 +93,9 @@ defaultModelPromise.then((record) => {
   }
   defaultModelRecordId = record.id ?? defaultModelRecordId;
   refreshModelLibrary(defaultModelRecordId);
-  tryAddPendingDefaultModelToStage();
+  if (!defaultModelSpawnedForStage) {
+    tryAddPendingDefaultModelToStage();
+  }
 });
 
 function updatePreviewButtonState() {
@@ -142,17 +147,58 @@ function addModelRecordToStage(record, { announce = false } = {}) {
 }
 
 function tryAddPendingDefaultModelToStage() {
+  if (defaultModelSpawnedForStage) {
+    return;
+  }
+  if (!pendingDefaultModelRecord) {
+    let candidate = null;
+    if (defaultModelRecordId) {
+      candidate = loadModelRecord(defaultModelRecordId);
+    }
+    if (!candidate) {
+      candidate = resolveDefaultModelRecord(savedModelRecords);
+    }
+    if (candidate) {
+      pendingDefaultModelRecord = candidate;
+    }
+  }
   if (!pendingDefaultModelRecord) {
     return;
   }
-  if (addModelRecordToStage(pendingDefaultModelRecord, { announce: true })) {
+  const record = pendingDefaultModelRecord;
+  if (addModelRecordToStage(record, { announce: true })) {
+    defaultModelRecordId = record.id ?? defaultModelRecordId;
     pendingDefaultModelRecord = null;
+    defaultModelSpawnedForStage = true;
   }
 }
 
-async function seedDefaultModelIfNeeded() {
-  if (savedModelRecords.length > 0) {
+function resolveDefaultModelRecord(records = []) {
+  if (!Array.isArray(records)) {
     return null;
+  }
+  const byId = records.find((entry) => entry && entry.id === DEFAULT_MODEL_ID);
+  if (byId) {
+    return deepClone(byId);
+  }
+  const lowerName = DEFAULT_MODEL_NAME.toLowerCase();
+  const byName = records.find((entry) => {
+    if (!entry || typeof entry.name !== 'string') {
+      return false;
+    }
+    return entry.name.trim().toLowerCase() === lowerName;
+  });
+  return byName ? deepClone(byName) : null;
+}
+
+async function seedDefaultModelIfNeeded() {
+  const existingRecord = resolveDefaultModelRecord(savedModelRecords);
+  if (existingRecord) {
+    if (!pendingDefaultModelRecord) {
+      pendingDefaultModelRecord = deepClone(existingRecord);
+    }
+    defaultModelRecordId = existingRecord.id ?? defaultModelRecordId;
+    return existingRecord;
   }
   try {
     const response = await fetch(DEFAULT_MODEL_URL);
@@ -174,7 +220,7 @@ async function seedDefaultModelIfNeeded() {
     const stored = saveModelRecord(record);
     if (stored) {
       savedModelRecords = listModelRecords();
-      pendingDefaultModelRecord = stored;
+      pendingDefaultModelRecord = deepClone(stored);
       defaultModelRecordId = stored.id ?? null;
       return stored;
     }
@@ -820,7 +866,7 @@ physicsWorker.addEventListener('message', (event) => {
     if (simulationToggleButton) {
       simulationToggleButton.disabled = false;
     }
-    updateStatus('Physics worker ready. Streaming hopper morph simulation…');
+    updateStatus('Physics worker ready. Streaming catdog morph simulation…');
     if (queuedStageId) {
       physicsWorker.postMessage({ type: 'load-stage', stageId: queuedStageId });
     }
@@ -830,7 +876,7 @@ physicsWorker.addEventListener('message', (event) => {
     if (data.buffer instanceof SharedArrayBuffer) {
       viewer.setSharedStateBuffer(data.buffer, data.layout);
       sharedStateEnabled = true;
-      updateStatus('Shared memory bridge established. Hopper pose updates are live.');
+      updateStatus('Shared memory bridge established. Catdog pose updates are live.');
     } else {
       viewer.clearSharedState();
       sharedStateEnabled = false;
@@ -844,7 +890,7 @@ physicsWorker.addEventListener('message', (event) => {
       updateStatus(
         physicsRunning
           ? 'Physics worker stepping. Awaiting shared memory access…'
-          : 'Simulation paused. Resume to continue the hopper test.'
+          : 'Simulation paused. Resume to continue the catdog test.'
       );
     }
   } else if (data.type === 'tick') {
@@ -859,7 +905,7 @@ physicsWorker.addEventListener('message', (event) => {
         }
       }
     } else if (physicsRunning) {
-      updateStatus('Shared memory synchronized. Hopper pose streaming from worker.');
+      updateStatus('Shared memory synchronized. Catdog pose streaming from worker.');
     }
     if (data.sensors?.summary && typeof data.timestamp === 'number') {
       if (data.timestamp - sensorLogTimestamp >= 500) {
@@ -900,6 +946,7 @@ physicsWorker.addEventListener('message', (event) => {
     }
     const label = stage.label ?? stage.id;
     updateStatus(`${label} stage ready. Simulation reset.`);
+    defaultModelSpawnedForStage = false;
     tryAddPendingDefaultModelToStage();
   } else if (data.type === 'stage-cleared') {
     updateStatus('Cleared all models from the stage.');
