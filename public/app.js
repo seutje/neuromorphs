@@ -54,6 +54,7 @@ const generationSummaryNodes = {
   runtime: document.querySelector('#generation-summary-runtime')
 };
 const modelLibraryContainer = document.querySelector('#model-library');
+const DEFAULT_MODEL_URL = new URL('../models/catdog.json', import.meta.url);
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -70,6 +71,8 @@ let activeRunTotalGenerations = 0;
 let generationViewer = null;
 let modelLibrary = null;
 let savedModelRecords = listModelRecords();
+let pendingDefaultModelRecord = null;
+let defaultModelRecordId = null;
 let activeStageId = DEFAULT_STAGE_ID;
 let queuedStageId = DEFAULT_STAGE_ID;
 let workerReady = false;
@@ -82,6 +85,16 @@ let physicsWorker = null;
 let viewer = null;
 let viewControls = null;
 let evolutionPanel = null;
+
+const defaultModelPromise = seedDefaultModelIfNeeded();
+defaultModelPromise.then((record) => {
+  if (!record) {
+    return;
+  }
+  defaultModelRecordId = record.id ?? defaultModelRecordId;
+  refreshModelLibrary(defaultModelRecordId);
+  tryAddPendingDefaultModelToStage();
+});
 
 function updatePreviewButtonState() {
   if (previewBestButton) {
@@ -98,6 +111,90 @@ function setLatestBestIndividual(individual) {
 }
 
 updatePreviewButtonState();
+
+function refreshModelLibrary(selectedId = null) {
+  if (!modelLibrary) {
+    return;
+  }
+  modelLibrary.setModels(savedModelRecords);
+  if (selectedId) {
+    modelLibrary.setSelectedId(selectedId);
+  }
+}
+
+function addModelRecordToStage(record, { announce = false } = {}) {
+  if (!record || !record.individual) {
+    return false;
+  }
+  if (!physicsWorker || !workerReady) {
+    return false;
+  }
+  const clone = deepClone(record.individual);
+  if (!clone) {
+    return false;
+  }
+  physicsWorker.postMessage({
+    type: 'add-individual',
+    individual: clone
+  });
+  if (announce) {
+    const label = typeof record.name === 'string' && record.name.trim() ? record.name.trim() : 'model';
+    updateStatus(`Loaded model "${label}" to the scene.`);
+  }
+  return true;
+}
+
+function tryAddPendingDefaultModelToStage() {
+  if (!pendingDefaultModelRecord) {
+    return;
+  }
+  if (addModelRecordToStage(pendingDefaultModelRecord, { announce: true })) {
+    pendingDefaultModelRecord = null;
+  }
+}
+
+async function seedDefaultModelIfNeeded() {
+  if (savedModelRecords.length > 0) {
+    return null;
+  }
+  try {
+    const response = await fetch(DEFAULT_MODEL_URL);
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`);
+    }
+    const payload = await response.json();
+    if (!payload || typeof payload !== 'object' || !payload.individual) {
+      throw new Error('Default model payload missing individual data.');
+    }
+    const name =
+      typeof payload.name === 'string' && payload.name.trim() ? payload.name.trim() : 'Default Model';
+    const record = {
+      id: typeof payload.id === 'string' && payload.id.trim() ? payload.id.trim() : undefined,
+      name,
+      individual: payload.individual,
+      config: payload.config ?? null
+    };
+    const stored = saveModelRecord(record);
+    if (stored) {
+      savedModelRecords = listModelRecords();
+      pendingDefaultModelRecord = stored;
+      defaultModelRecordId = stored.id ?? null;
+      return stored;
+    }
+    pendingDefaultModelRecord = {
+      id: record.id ?? null,
+      name: record.name,
+      individual: deepClone(record.individual),
+      config: record.config ? deepClone(record.config) : null
+    };
+    defaultModelRecordId = pendingDefaultModelRecord.id;
+    savedModelRecords = listModelRecords();
+    return pendingDefaultModelRecord;
+  } catch (error) {
+    console.warn('Failed to load default model for the stage:', error);
+    return null;
+  }
+}
 
 function loadStage(stageId, { announce = true } = {}) {
   const stage = getStageDefinition(stageId ?? activeStageId ?? DEFAULT_STAGE_ID);
@@ -473,6 +570,9 @@ if (modelLibraryContainer) {
   modelLibrary = createModelLibrary({ container: modelLibraryContainer });
   modelLibrary.setHasModelAvailable(Boolean(latestBestIndividual));
   modelLibrary.setModels(savedModelRecords);
+  if (defaultModelRecordId) {
+    modelLibrary.setSelectedId(defaultModelRecordId);
+  }
   modelLibrary.onSave((name) => {
     if (!latestBestIndividual) {
       updateStatus('No evolved individual to save yet.');
@@ -787,6 +887,7 @@ physicsWorker.addEventListener('message', (event) => {
     }
     const label = stage.label ?? stage.id;
     updateStatus(`${label} stage ready. Simulation reset.`);
+    tryAddPendingDefaultModelToStage();
   } else if (data.type === 'stage-cleared') {
     updateStatus('Cleared all models from the stage.');
   } else if (data.type === 'stage-error') {
