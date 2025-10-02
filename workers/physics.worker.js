@@ -57,7 +57,7 @@ let creatureJointDescriptors = [];
 let creatureJointMap = new Map();
 let sharedMaterialMap = {};
 let additionalInstanceCount = 0;
-let controllerRuntime = null;
+const controllerInstances = new Map();
 let replayRecorder = createReplayRecorder();
 let activeReplay = null;
 
@@ -120,6 +120,56 @@ function computeInstanceOffset(index) {
   return { x: direction * step * spacing, y: 0, z: 0 };
 }
 
+function cloneControllerBlueprintForInstance(blueprint, prefix) {
+  if (!blueprint || typeof blueprint !== 'object') {
+    return null;
+  }
+  const clone = JSON.parse(JSON.stringify(blueprint));
+  if (Array.isArray(clone.nodes)) {
+    clone.nodes.forEach((node) => {
+      if (node?.source && typeof node.source === 'object' && typeof node.source.id === 'string' && prefix) {
+        node.source.id = `${prefix}${node.source.id}`;
+      }
+      if (node?.target && typeof node.target === 'object' && typeof node.target.id === 'string' && prefix) {
+        node.target.id = `${prefix}${node.target.id}`;
+      }
+    });
+    clone.sensors = clone.nodes.filter((node) => node?.type === 'sensor');
+    clone.actuators = clone.nodes.filter((node) => node?.type === 'actuator');
+  }
+  if (!Array.isArray(clone.connections)) {
+    clone.connections = [];
+  }
+  if (!Array.isArray(clone.errors)) {
+    clone.errors = [];
+  }
+  if (!clone.metadata || typeof clone.metadata !== 'object') {
+    clone.metadata = {};
+  }
+  return clone;
+}
+
+function collectControllerActuatorIds() {
+  const ids = new Set();
+  controllerInstances.forEach((instance, key) => {
+    const runtime = instance?.runtime;
+    if (!runtime || !Array.isArray(runtime.actuators)) {
+      return;
+    }
+    runtime.actuators.forEach((actuatorId) => {
+      if (typeof actuatorId !== 'string') {
+        return;
+      }
+      if (instance.prefix) {
+        ids.add(`${key}:${actuatorId}`);
+      } else {
+        ids.add(actuatorId);
+      }
+    });
+  });
+  return Array.from(ids);
+}
+
 function clearCreature() {
   if (!world) {
     return;
@@ -140,7 +190,7 @@ function clearCreature() {
   creatureJointMap.clear();
   sharedMaterialMap = {};
   additionalInstanceCount = 0;
-  controllerRuntime = null;
+  controllerInstances.clear();
   replayRecorder.clear();
 }
 
@@ -205,7 +255,7 @@ function startReplayRecording() {
   }
   replayRecorder.start({
     jointDescriptors: creatureJointDescriptors,
-    actuatorIds: controllerRuntime?.actuators ?? [],
+    actuatorIds: collectControllerActuatorIds(),
     timestep: world.timestep ?? 1 / 60
   });
 }
@@ -383,9 +433,11 @@ function resetCreature() {
     entry.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     entry.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
   });
-  if (controllerRuntime) {
-    controllerRuntime.reset();
-  }
+  controllerInstances.forEach((instance) => {
+    if (instance?.runtime?.reset) {
+      instance.runtime.reset();
+    }
+  });
   syncSharedState();
 }
 
@@ -417,6 +469,7 @@ function instantiateCreature(morphGenome, controllerGenome, options = {}) {
         .toString(36)
         .slice(0, 4)}-`
     : '';
+  const instanceKey = isAdditional ? prefixBase : 'primary';
 
   const materialSource = clearExisting ? {} : { ...sharedMaterialMap };
   Object.entries(blueprint.materials).forEach(([key, value]) => {
@@ -555,25 +608,36 @@ function instantiateCreature(morphGenome, controllerGenome, options = {}) {
   configureSharedState(bodyDescriptorsCache, sharedMaterialMap);
   syncSharedState();
 
-  if (clearExisting) {
-    const controllerSource = controllerGenome ?? createDefaultControllerGenome();
-    const controllerBlueprint = buildControllerBlueprint(controllerSource);
-    if (controllerBlueprint.errors.length > 0) {
+  const controllerSource = controllerGenome ?? createDefaultControllerGenome();
+  const controllerBlueprint = buildControllerBlueprint(controllerSource);
+  if (controllerBlueprint.errors.length > 0) {
+    postMessage({
+      type: 'error',
+      message: `Failed to build controller: ${controllerBlueprint.errors.join('; ')}`
+    });
+  } else {
+    const instanceBlueprint = cloneControllerBlueprintForInstance(
+      controllerBlueprint,
+      isAdditional ? prefixBase : ''
+    );
+    if (!instanceBlueprint) {
       postMessage({
         type: 'error',
-        message: `Failed to build controller: ${controllerBlueprint.errors.join('; ')}`
+        message: 'Controller blueprint could not be prepared.'
       });
     } else {
-      controllerRuntime = createControllerRuntime(controllerBlueprint);
-      if (!controllerRuntime) {
+      const runtime = createControllerRuntime(instanceBlueprint);
+      if (!runtime) {
         postMessage({
           type: 'error',
           message: 'Controller runtime failed to initialize.'
         });
+      } else {
+        controllerInstances.set(instanceKey, { runtime, prefix: isAdditional ? prefixBase : '' });
       }
     }
-    additionalInstanceCount = 0;
-  } else if (isAdditional) {
+  }
+  if (isAdditional) {
     additionalInstanceCount += 1;
   }
 
@@ -827,8 +891,8 @@ function stepSimulation() {
 
   const dt = world.timestep ?? 1 / 60;
   const sensors = gatherSensorSnapshot();
-  let controllerResult = null;
-  let commands = [];
+  const commands = [];
+  let controllerTelemetry = null;
   if (isReplayActive()) {
     const frame = activeReplay.next();
     if (!frame) {
@@ -837,14 +901,68 @@ function stepSimulation() {
       postMessage({ type: 'replay-complete' });
       return;
     }
-    commands = frame.commands.map((command) => ({
-      id: command.actuatorId ?? undefined,
-      target: { type: 'joint', id: command.targetId },
-      value: command.value
-    }));
-  } else if (controllerRuntime) {
-    controllerResult = controllerRuntime.update(dt, sensors);
-    commands = Array.isArray(controllerResult?.commands) ? controllerResult.commands : [];
+    frame.commands.forEach((command) => {
+      if (!command || typeof command.targetId !== 'string') {
+        return;
+      }
+      commands.push({
+        id: typeof command.actuatorId === 'string' ? command.actuatorId : null,
+        target: { type: 'joint', id: command.targetId },
+        value: command.value
+      });
+    });
+  } else if (controllerInstances.size > 0) {
+    const runtimeResults = [];
+    controllerInstances.forEach((instance, key) => {
+      const runtime = instance?.runtime;
+      if (!runtime || typeof runtime.update !== 'function') {
+        return;
+      }
+      const result = runtime.update(dt, sensors);
+      if (!result) {
+        return;
+      }
+      runtimeResults.push({ key, prefix: instance.prefix ?? '', result });
+      const resultCommands = Array.isArray(result.commands) ? result.commands : [];
+      resultCommands.forEach((command) => {
+        if (!command || command.target?.type !== 'joint' || typeof command.target.id !== 'string') {
+          return;
+        }
+        const actuatorId = typeof command.id === 'string' ? command.id : null;
+        const decoratedId = instance.prefix && actuatorId ? `${key}:${actuatorId}` : actuatorId;
+        commands.push({
+          id: decoratedId,
+          target: { type: 'joint', id: command.target.id },
+          value: command.value
+        });
+      });
+    });
+    if (runtimeResults.length === 1) {
+      const only = runtimeResults[0].result;
+      if (Array.isArray(only?.nodeOutputs)) {
+        controllerTelemetry = only.nodeOutputs;
+      }
+    } else if (runtimeResults.length > 1) {
+      const combined = [];
+      runtimeResults.forEach(({ key, prefix, result }) => {
+        if (!Array.isArray(result?.nodeOutputs)) {
+          return;
+        }
+        result.nodeOutputs.forEach((node) => {
+          if (!node || typeof node !== 'object') {
+            return;
+          }
+          const entry = { ...node, instance: key };
+          if (prefix && typeof node.id === 'string') {
+            entry.id = `${key}:${node.id}`;
+          }
+          combined.push(entry);
+        });
+      });
+      if (combined.length > 0) {
+        controllerTelemetry = combined;
+      }
+    }
   }
 
   if (commands.length > 0) {
@@ -873,8 +991,8 @@ function stepSimulation() {
     payload.bodies = collectBodyStates();
   }
 
-  if (controllerResult?.nodeOutputs) {
-    payload.controller = controllerResult.nodeOutputs;
+  if (controllerTelemetry) {
+    payload.controller = controllerTelemetry;
   }
 
   if (commands.length > 0) {
