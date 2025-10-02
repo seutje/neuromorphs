@@ -10,6 +10,31 @@ import { DEFAULT_STAGE_ID } from '../public/environment/stages.js';
 
 const activeRuns = new Map();
 
+function registerAbortFlag(abortBuffer) {
+  if (!abortBuffer) {
+    return null;
+  }
+  try {
+    return new Int32Array(abortBuffer);
+  } catch (_error) {
+    return null;
+  }
+}
+
+function createAbortChecker(controller, abortView) {
+  return () => {
+    if (controller.signal.aborted) {
+      throw controller.signal.reason ?? createAbortError();
+    }
+    if (abortView && typeof Atomics?.load === 'function' && Atomics.load(abortView, 0) === 1) {
+      if (!controller.signal.aborted) {
+        controller.abort(createAbortError());
+      }
+      throw controller.signal.reason ?? createAbortError();
+    }
+  };
+}
+
 function createAbortError() {
   try {
     return new DOMException('Evolution aborted', 'AbortError');
@@ -40,7 +65,11 @@ self.addEventListener('message', async (event) => {
     return;
   }
   if (data.type === 'abort') {
-    const controller = activeRuns.get(data.id);
+    const record = activeRuns.get(data.id);
+    if (record?.abortView && typeof Atomics?.store === 'function') {
+      Atomics.store(record.abortView, 0, 1);
+    }
+    const controller = record?.controller;
     if (controller && !controller.signal.aborted) {
       controller.abort(createAbortError());
     }
@@ -74,7 +103,9 @@ self.addEventListener('message', async (event) => {
   } = payload;
 
   const controller = new AbortController();
-  activeRuns.set(id, controller);
+  const abortView = registerAbortFlag(payload.abortBuffer);
+  activeRuns.set(id, { controller, abortView });
+  const checkAbort = createAbortChecker(controller, abortView);
 
   const evalRng = createRng(rngState ?? rngSeed ?? 1);
   const weights = resolveSelectionWeights(selectionWeights);
@@ -106,6 +137,7 @@ self.addEventListener('message', async (event) => {
         });
       },
       evaluate: async (individual) => {
+        checkAbort();
         const simulationResult = await simulateLocomotion({
           morphGenome: individual.morph,
           controllerGenome: individual.controller,
@@ -113,7 +145,8 @@ self.addEventListener('message', async (event) => {
           timestep: simulation?.timestep,
           sampleInterval: simulation?.sampleInterval,
           signal: controller.signal,
-          stageId: simulation?.stageId ?? DEFAULT_STAGE_ID
+          stageId: simulation?.stageId ?? DEFAULT_STAGE_ID,
+          shouldAbort: checkAbort
         });
         const metrics = computeLocomotionFitness(simulationResult.trace);
         const fitnessScore = scoreLocomotionWithWeights(metrics, weights);

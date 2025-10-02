@@ -121,6 +121,18 @@ export function runEvolutionInWorker({
       return;
     }
 
+    let abortBuffer = null;
+    let abortView = null;
+    if (typeof SharedArrayBuffer === 'function') {
+      try {
+        abortBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
+        abortView = new Int32Array(abortBuffer);
+      } catch (_error) {
+        abortBuffer = null;
+        abortView = null;
+      }
+    }
+
     const record = {
       id: runId,
       resolve,
@@ -128,13 +140,17 @@ export function runEvolutionInWorker({
       onGeneration,
       onStateSnapshot,
       signal,
-      abortHandler: null
+      abortHandler: null,
+      abortView
     };
 
     pendingRuns.set(runId, record);
 
     if (signal) {
       const abortHandler = () => {
+        if (record.abortView && typeof Atomics?.store === 'function') {
+          Atomics.store(record.abortView, 0, 1);
+        }
         worker.postMessage({ type: 'abort', id: runId });
       };
       record.abortHandler = abortHandler;
@@ -157,7 +173,8 @@ export function runEvolutionInWorker({
         startGeneration,
         history,
         selectionWeights: weights,
-        simulation
+        simulation,
+        abortBuffer
       }
     });
   });
