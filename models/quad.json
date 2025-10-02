@@ -1,0 +1,764 @@
+{
+  "id": "df9d6c08-6b1a-4fa5-9d16-f6a74b8c4f8f",
+  "name": "quad",
+  "createdAt": 1759444228874,
+  "updatedAt": 1759444228874,
+  "config": {
+    "seed": 2024,
+    "populationSize": 16,
+    "generations": 12,
+    "selectionWeights": {
+      "distance": 0.6,
+      "speed": 1,
+      "upright": 1.1
+    },
+    "morphMutation": {
+      "addLimbChance": 0.24,
+      "resizeChance": 0.72,
+      "jointJitterChance": 0.58
+    },
+    "controllerMutation": {
+      "weightJitterChance": 0.8,
+      "oscillatorChance": 0.68,
+      "addConnectionChance": 0.42
+    },
+    "stageId": "dash"
+  },
+  "individual": {
+    "id": "prefab-03-quadwalker-01",
+    "morph": {
+      "version": "0.1.0",
+      "metadata": {
+        "name": "Quad Walker",
+        "description": "Simple quadruped prefab for locomotion experiments and controller tuning.",
+        "tags": [
+          "demo",
+          "prefab",
+          "quadruped"
+        ]
+      },
+      "materials": {
+        "core": {
+          "color": "#f97316",
+          "density": 1.04,
+          "roughness": 0.36,
+          "metalness": 0.18,
+          "friction": 0.9,
+          "restitution": 0.18
+        },
+        "limb": {
+          "color": "#3b82f6",
+          "density": 0.96,
+          "roughness": 0.42,
+          "metalness": 0.1,
+          "friction": 0.92,
+          "restitution": 0.22
+        },
+        "foot": {
+          "color": "#22c55e",
+          "density": 0.9,
+          "roughness": 0.48,
+          "metalness": 0.06,
+          "friction": 0.95,
+          "restitution": 0.28
+        }
+      },
+      "bodies": [
+        {
+          "id": "torso",
+          "shape": "cuboid",
+          "halfExtents": [
+            0.34,
+            0.16,
+            0.2
+          ],
+          "density": 1.04,
+          "material": "core",
+          "pose": {
+            "position": [
+              0,
+              1,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          }
+        },
+        {
+          "id": "front-left-leg",
+          "shape": "cuboid",
+          "halfExtents": [
+            0.09,
+            0.36,
+            0.09
+          ],
+          "density": 0.96,
+          "material": "limb",
+          "pose": {
+            "position": [
+              0.26,
+              -0.6,
+              0.18
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "joint": {
+            "parentId": "torso",
+            "type": "revolute",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "parentAnchor": [
+              0.26,
+              -0.12,
+              0.18
+            ],
+            "childAnchor": [
+              0,
+              0.36,
+              0
+            ],
+            "limits": [
+              -1.05,
+              0.55
+            ]
+          }
+        },
+        {
+          "id": "front-right-leg",
+          "shape": "cuboid",
+          "halfExtents": [
+            0.09,
+            0.36,
+            0.09
+          ],
+          "density": 0.96,
+          "material": "limb",
+          "pose": {
+            "position": [
+              0.26,
+              -0.6,
+              -0.18
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "joint": {
+            "parentId": "torso",
+            "type": "revolute",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "parentAnchor": [
+              0.26,
+              -0.12,
+              -0.18
+            ],
+            "childAnchor": [
+              0,
+              0.36,
+              0
+            ],
+            "limits": [
+              -1.05,
+              0.55
+            ]
+          }
+        },
+        {
+          "id": "rear-left-leg",
+          "shape": "cuboid",
+          "halfExtents": [
+            0.09,
+            0.36,
+            0.09
+          ],
+          "density": 0.96,
+          "material": "limb",
+          "pose": {
+            "position": [
+              -0.26,
+              -0.6,
+              0.18
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "joint": {
+            "parentId": "torso",
+            "type": "revolute",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "parentAnchor": [
+              -0.26,
+              -0.12,
+              0.18
+            ],
+            "childAnchor": [
+              0,
+              0.36,
+              0
+            ],
+            "limits": [
+              -1.05,
+              0.6
+            ]
+          }
+        },
+        {
+          "id": "rear-right-leg",
+          "shape": "cuboid",
+          "halfExtents": [
+            0.09,
+            0.36,
+            0.09
+          ],
+          "density": 0.96,
+          "material": "limb",
+          "pose": {
+            "position": [
+              -0.26,
+              -0.6,
+              -0.18
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "joint": {
+            "parentId": "torso",
+            "type": "revolute",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "parentAnchor": [
+              -0.26,
+              -0.12,
+              -0.18
+            ],
+            "childAnchor": [
+              0,
+              0.36,
+              0
+            ],
+            "limits": [
+              -1.05,
+              0.6
+            ]
+          }
+        },
+        {
+          "id": "front-left-foot",
+          "shape": "cuboid",
+          "halfExtents": [
+            0.1,
+            0.08,
+            0.16
+          ],
+          "density": 0.9,
+          "material": "foot",
+          "pose": {
+            "position": [
+              0.28,
+              -1.16,
+              0.18
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "joint": {
+            "parentId": "front-left-leg",
+            "type": "revolute",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "parentAnchor": [
+              0,
+              -0.34,
+              0
+            ],
+            "childAnchor": [
+              0,
+              0.08,
+              0
+            ],
+            "limits": [
+              -0.4,
+              0.9
+            ]
+          }
+        },
+        {
+          "id": "front-right-foot",
+          "shape": "cuboid",
+          "halfExtents": [
+            0.1,
+            0.08,
+            0.16
+          ],
+          "density": 0.9,
+          "material": "foot",
+          "pose": {
+            "position": [
+              0.28,
+              -1.16,
+              -0.18
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "joint": {
+            "parentId": "front-right-leg",
+            "type": "revolute",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "parentAnchor": [
+              0,
+              -0.34,
+              0
+            ],
+            "childAnchor": [
+              0,
+              0.08,
+              0
+            ],
+            "limits": [
+              -0.4,
+              0.9
+            ]
+          }
+        },
+        {
+          "id": "rear-left-foot",
+          "shape": "cuboid",
+          "halfExtents": [
+            0.1,
+            0.08,
+            0.16
+          ],
+          "density": 0.9,
+          "material": "foot",
+          "pose": {
+            "position": [
+              -0.28,
+              -1.16,
+              0.18
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "joint": {
+            "parentId": "rear-left-leg",
+            "type": "revolute",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "parentAnchor": [
+              0,
+              -0.34,
+              0
+            ],
+            "childAnchor": [
+              0,
+              0.08,
+              0
+            ],
+            "limits": [
+              -0.4,
+              0.9
+            ]
+          }
+        },
+        {
+          "id": "rear-right-foot",
+          "shape": "cuboid",
+          "halfExtents": [
+            0.1,
+            0.08,
+            0.16
+          ],
+          "density": 0.9,
+          "material": "foot",
+          "pose": {
+            "position": [
+              -0.28,
+              -1.16,
+              -0.18
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "joint": {
+            "parentId": "rear-right-leg",
+            "type": "revolute",
+            "axis": [
+              1,
+              0,
+              0
+            ],
+            "parentAnchor": [
+              0,
+              -0.34,
+              0
+            ],
+            "childAnchor": [
+              0,
+              0.08,
+              0
+            ],
+            "limits": [
+              -0.4,
+              0.9
+            ]
+          }
+        }
+      ]
+    },
+    "controller": {
+      "version": "0.1.0",
+      "metadata": {
+        "name": "Quad Walker Controller",
+        "description": "Out-of-phase oscillator pair driving stance and swing for a symmetric quadruped.",
+        "tags": [
+          "demo",
+          "phase-3"
+        ]
+      },
+      "nodes": [
+        {
+          "id": "bias",
+          "type": "constant",
+          "value": 1
+        },
+        {
+          "id": "torso-height",
+          "type": "sensor",
+          "gain": 1,
+          "offset": 0,
+          "source": {
+            "type": "body",
+            "id": "torso",
+            "metric": "height"
+          }
+        },
+        {
+          "id": "front-contact",
+          "type": "sensor",
+          "gain": 1,
+          "offset": 0,
+          "source": {
+            "type": "body",
+            "id": "front-left-foot",
+            "metric": "contact"
+          }
+        },
+        {
+          "id": "rear-contact",
+          "type": "sensor",
+          "gain": 1,
+          "offset": 0,
+          "source": {
+            "type": "body",
+            "id": "rear-left-foot",
+            "metric": "contact"
+          }
+        },
+        {
+          "id": "front-oscillator",
+          "type": "oscillator",
+          "amplitude": 0.55,
+          "frequency": 1.2,
+          "frequencyGain": 0.32,
+          "bias": 0,
+          "offset": 0,
+          "phaseOffset": 0
+        },
+        {
+          "id": "rear-oscillator",
+          "type": "oscillator",
+          "amplitude": 0.55,
+          "frequency": 1.2,
+          "frequencyGain": 0.32,
+          "bias": 0,
+          "offset": 0,
+          "phaseOffset": 3.14159
+        },
+        {
+          "id": "front-left-hip",
+          "type": "actuator",
+          "activation": "tanh",
+          "gain": 9,
+          "clamp": 1,
+          "bias": 0,
+          "offset": 0,
+          "target": {
+            "type": "joint",
+            "id": "torso__front-left-leg",
+            "channel": "torque"
+          }
+        },
+        {
+          "id": "front-right-hip",
+          "type": "actuator",
+          "activation": "tanh",
+          "gain": 9,
+          "clamp": 1,
+          "bias": 0,
+          "offset": 0,
+          "target": {
+            "type": "joint",
+            "id": "torso__front-right-leg",
+            "channel": "torque"
+          }
+        },
+        {
+          "id": "rear-left-hip",
+          "type": "actuator",
+          "activation": "tanh",
+          "gain": 9,
+          "clamp": 1,
+          "bias": 0,
+          "offset": 0,
+          "target": {
+            "type": "joint",
+            "id": "torso__rear-left-leg",
+            "channel": "torque"
+          }
+        },
+        {
+          "id": "rear-right-hip",
+          "type": "actuator",
+          "activation": "tanh",
+          "gain": 9,
+          "clamp": 1,
+          "bias": 0,
+          "offset": 0,
+          "target": {
+            "type": "joint",
+            "id": "torso__rear-right-leg",
+            "channel": "torque"
+          }
+        },
+        {
+          "id": "front-left-ankle",
+          "type": "actuator",
+          "activation": "tanh",
+          "gain": 8,
+          "clamp": 1,
+          "bias": 0,
+          "offset": 0,
+          "target": {
+            "type": "joint",
+            "id": "front-left-leg__front-left-foot",
+            "channel": "torque"
+          }
+        },
+        {
+          "id": "front-right-ankle",
+          "type": "actuator",
+          "activation": "tanh",
+          "gain": 8,
+          "clamp": 1,
+          "bias": 0,
+          "offset": 0,
+          "target": {
+            "type": "joint",
+            "id": "front-right-leg__front-right-foot",
+            "channel": "torque"
+          }
+        },
+        {
+          "id": "rear-left-ankle",
+          "type": "actuator",
+          "activation": "tanh",
+          "gain": 8,
+          "clamp": 1,
+          "bias": 0,
+          "offset": 0,
+          "target": {
+            "type": "joint",
+            "id": "rear-left-leg__rear-left-foot",
+            "channel": "torque"
+          }
+        },
+        {
+          "id": "rear-right-ankle",
+          "type": "actuator",
+          "activation": "tanh",
+          "gain": 8,
+          "clamp": 1,
+          "bias": 0,
+          "offset": 0,
+          "target": {
+            "type": "joint",
+            "id": "rear-right-leg__rear-right-foot",
+            "channel": "torque"
+          }
+        }
+      ],
+      "connections": [
+        {
+          "id": "c-bias-front",
+          "source": "bias",
+          "target": "front-oscillator",
+          "weight": 0.35
+        },
+        {
+          "id": "c-bias-rear",
+          "source": "bias",
+          "target": "rear-oscillator",
+          "weight": 0.35
+        },
+        {
+          "id": "c-height-front",
+          "source": "torso-height",
+          "target": "front-oscillator",
+          "weight": -0.22
+        },
+        {
+          "id": "c-height-rear",
+          "source": "torso-height",
+          "target": "rear-oscillator",
+          "weight": -0.22
+        },
+        {
+          "id": "c-front-contact",
+          "source": "front-contact",
+          "target": "front-oscillator",
+          "weight": -0.28
+        },
+        {
+          "id": "c-rear-contact",
+          "source": "rear-contact",
+          "target": "rear-oscillator",
+          "weight": -0.28
+        },
+        {
+          "id": "c-front-to-rear",
+          "source": "front-oscillator",
+          "target": "rear-oscillator",
+          "weight": -0.5
+        },
+        {
+          "id": "c-rear-to-front",
+          "source": "rear-oscillator",
+          "target": "front-oscillator",
+          "weight": -0.5
+        },
+        {
+          "id": "c-front-left-hip",
+          "source": "front-oscillator",
+          "target": "front-left-hip",
+          "weight": 0.85
+        },
+        {
+          "id": "c-front-right-hip",
+          "source": "front-oscillator",
+          "target": "front-right-hip",
+          "weight": -0.85
+        },
+        {
+          "id": "c-rear-left-hip",
+          "source": "rear-oscillator",
+          "target": "rear-left-hip",
+          "weight": 0.85
+        },
+        {
+          "id": "c-rear-right-hip",
+          "source": "rear-oscillator",
+          "target": "rear-right-hip",
+          "weight": -0.85
+        },
+        {
+          "id": "c-front-left-ankle",
+          "source": "front-oscillator",
+          "target": "front-left-ankle",
+          "weight": 0.6
+        },
+        {
+          "id": "c-front-right-ankle",
+          "source": "front-oscillator",
+          "target": "front-right-ankle",
+          "weight": -0.6
+        },
+        {
+          "id": "c-rear-left-ankle",
+          "source": "rear-oscillator",
+          "target": "rear-left-ankle",
+          "weight": 0.6
+        },
+        {
+          "id": "c-rear-right-ankle",
+          "source": "rear-oscillator",
+          "target": "rear-right-ankle",
+          "weight": -0.6
+        }
+      ]
+    },
+    "lineage": {
+      "parentId": "prefab-03-quadwalker",
+      "operations": {
+        "morph": [
+          "add-limb",
+          "tune-joint"
+        ],
+        "controller": [
+          "add-oscillator",
+          "weight-jitter"
+        ]
+      }
+    }
+  }
+}

@@ -64,6 +64,9 @@ const DEFAULT_MODEL_NAME = 'catdog';
 const HOOMAN_MODEL_URL = new URL('../models/hooman.json', import.meta.url);
 const HOOMAN_MODEL_ID = 'd9c1b1a1-869d-4f6a-a3e1-30d8f02c587b';
 const HOOMAN_MODEL_NAME = 'hooman';
+const QUAD_MODEL_URL = new URL('../models/quad.json', import.meta.url);
+const QUAD_MODEL_ID = 'df9d6c08-6b1a-4fa5-9d16-f6a74b8c4f8f';
+const QUAD_MODEL_NAME = 'quad';
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -366,6 +369,11 @@ async function seedAdditionalPrefabs() {
       id: HOOMAN_MODEL_ID,
       name: HOOMAN_MODEL_NAME,
       url: HOOMAN_MODEL_URL
+    },
+    {
+      id: QUAD_MODEL_ID,
+      name: QUAD_MODEL_NAME,
+      url: QUAD_MODEL_URL
     }
   ];
   let changed = false;
