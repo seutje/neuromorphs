@@ -407,7 +407,8 @@ export function buildMorphologyBlueprint(genome) {
         limits:
           Array.isArray(node.joint.limits) && node.joint.limits.length === 2
             ? node.joint.limits.map((limit) => Number(limit) || 0)
-            : null
+            : null,
+        disableContacts: Boolean(node.joint.disableContacts)
       });
     }
 
