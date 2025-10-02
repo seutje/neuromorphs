@@ -42,7 +42,7 @@ h2 {
 
 .content {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.5rem;
   padding: 1.5rem;
   flex: 1;
@@ -113,14 +113,69 @@ h2 {
   gap: 1.25rem;
 }
 
+.evolution-panel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.evolution-panel__intro {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .panel-description {
   margin: 0;
   color: rgba(226, 232, 240, 0.75);
 }
 
 .config-form {
+  grid-column: 1 / -1;
   display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.config-column {
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
+}
+
+.config-column--actions {
+  gap: 1.25rem;
+}
+
+.evolution-panel #generation-viewer {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 1200px) {
+  .evolution-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .config-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .config-column--actions {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .content {
+    padding: 1rem;
+  }
+  .evolution-panel {
+    grid-template-columns: 1fr;
+  }
+  .config-form {
+    grid-template-columns: 1fr;
+  }
 }
 
 .config-form fieldset {
