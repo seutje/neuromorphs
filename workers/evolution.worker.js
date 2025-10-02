@@ -1,6 +1,10 @@
 import { runEvolution } from '../public/evolution/evolutionEngine.js';
 import { simulateLocomotion } from '../public/evolution/simulator.js';
-import { computeLocomotionFitness } from '../public/evolution/fitness.js';
+import {
+  computeLocomotionFitness,
+  resolveSelectionWeights,
+  scoreLocomotionWithWeights
+} from '../public/evolution/fitness.js';
 import { createRng } from '../public/evolution/rng.js';
 
 const activeRuns = new Map();
@@ -64,13 +68,15 @@ self.addEventListener('message', async (event) => {
     rngState,
     startGeneration,
     history,
-    simulation
+    simulation,
+    selectionWeights
   } = payload;
 
   const controller = new AbortController();
   activeRuns.set(id, controller);
 
   const evalRng = createRng(rngState ?? rngSeed ?? 1);
+  const weights = resolveSelectionWeights(selectionWeights);
 
   try {
     const result = await runEvolution({
@@ -108,8 +114,9 @@ self.addEventListener('message', async (event) => {
           signal: controller.signal
         });
         const metrics = computeLocomotionFitness(simulationResult.trace);
+        const fitnessScore = scoreLocomotionWithWeights(metrics, weights);
         return {
-          fitness: metrics.fitness,
+          fitness: fitnessScore,
           metrics,
           extras: {
             trace: simulationResult.trace,

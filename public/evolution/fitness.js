@@ -14,6 +14,26 @@ const DEFAULT_OPTIONS = {
   objectivePosition: OBJECTIVE_POSITION
 };
 
+export const DEFAULT_SELECTION_WEIGHTS = {
+  distance: 0.5,
+  speed: 1,
+  upright: 1
+};
+
+export function objectiveToSelectionWeights(objective) {
+  const normalized = typeof objective === 'string' ? objective.toLowerCase() : '';
+  if (normalized === 'distance') {
+    return { distance: 1.5, speed: 1, upright: 1 };
+  }
+  if (normalized === 'speed') {
+    return { distance: 1, speed: 1.5, upright: 1 };
+  }
+  if (normalized === 'upright') {
+    return { distance: 1, speed: 1, upright: 1.5 };
+  }
+  return { ...DEFAULT_SELECTION_WEIGHTS };
+}
+
 function toVector(sample) {
   if (sample && typeof sample === 'object') {
     const x = Number(sample.x ?? sample[0]) || 0;
@@ -30,6 +50,25 @@ function horizontalDistance(a, b) {
 
 function safeNumber(value, fallback = 0) {
   return Number.isFinite(Number(value)) ? Number(value) : fallback;
+}
+
+function clampNonNegative(value, fallback = 0) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return Math.max(fallback, 0);
+  }
+  return Math.max(number, 0);
+}
+
+export function resolveSelectionWeights(weights) {
+  if (!weights || typeof weights !== 'object') {
+    return { ...DEFAULT_SELECTION_WEIGHTS };
+  }
+  return {
+    distance: clampNonNegative(weights.distance, DEFAULT_SELECTION_WEIGHTS.distance),
+    speed: clampNonNegative(weights.speed, DEFAULT_SELECTION_WEIGHTS.speed),
+    upright: clampNonNegative(weights.upright, DEFAULT_SELECTION_WEIGHTS.upright)
+  };
 }
 
 function estimateHeightPercentile(values, percentile) {
@@ -154,6 +193,34 @@ export function computeLocomotionFitness(samples, options = {}) {
       0
     )
   };
+}
+
+export function scoreLocomotionWithWeights(metrics, weights = DEFAULT_SELECTION_WEIGHTS) {
+  if (!metrics || typeof metrics !== 'object') {
+    return 0;
+  }
+
+  const resolvedWeights = resolveSelectionWeights(weights);
+  const displacement = Number.isFinite(metrics.displacement)
+    ? Math.max(metrics.displacement, 0)
+    : 0;
+  const averageSpeed = Number.isFinite(metrics.averageSpeed)
+    ? Math.max(metrics.averageSpeed, 0)
+    : 0;
+  const uprightScore = Number.isFinite(metrics.fallFraction)
+    ? Math.max(1 - metrics.fallFraction, 0)
+    : 0;
+  const baseFitness = Number.isFinite(metrics.fitness) && metrics.fitness > 0
+    ? Math.max(metrics.fitness, 0)
+    : displacement + averageSpeed * 0.5;
+
+  const score =
+    baseFitness +
+    resolvedWeights.distance * displacement +
+    resolvedWeights.speed * averageSpeed +
+    resolvedWeights.upright * uprightScore * baseFitness;
+
+  return Math.max(score, 0);
 }
 
 export function createFitnessAccumulator(options = {}) {
