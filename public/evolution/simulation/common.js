@@ -1,3 +1,5 @@
+import { MAX_JOINT_ANGULAR_DELTA } from '../../physics/constants.js';
+
 const MAX_MASK_VALUE = 0xffff;
 
 export function createInteractionGroup(membership, filter) {
@@ -59,6 +61,6 @@ export function projectAngularInertia(matrix, axis) {
   );
 }
 
-export const MAX_JOINT_ANGULAR_DELTA = 15;
+export { MAX_JOINT_ANGULAR_DELTA };
 export const COLLISION_GROUP_CREATURE = createInteractionGroup(0b0001, 0xfffe);
 export const COLLISION_GROUP_ENVIRONMENT = createInteractionGroup(0b0010, 0xffff);

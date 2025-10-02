@@ -20,6 +20,7 @@ import {
   OBJECTIVE_POSITION,
   horizontalDistanceToObjective
 } from '../public/environment/arena.js';
+import { MAX_JOINT_ANGULAR_DELTA } from '../public/physics/constants.js';
 
 function createInteractionGroup(membership, filter) {
   const membershipMask = membership & 0xffff;
@@ -31,7 +32,6 @@ const META_LENGTH = 2;
 const META_VERSION_INDEX = 0;
 const META_WRITE_LOCK_INDEX = 1;
 const FLOATS_PER_BODY = 7;
-const MAX_JOINT_ANGULAR_DELTA = 2; // rad/s per simulation step
 const COLLISION_GROUP_CREATURE = createInteractionGroup(0b0001, 0xfffe);
 const COLLISION_GROUP_ENVIRONMENT = createInteractionGroup(0b0010, 0xffff);
 
