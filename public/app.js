@@ -9,8 +9,13 @@ import {
   clearRunState,
   saveReplayRecord,
   loadReplayRecord,
-  clearReplayRecord
+  clearReplayRecord,
+  saveModelRecord,
+  loadModelRecord,
+  listModelRecords,
+  deleteModelRecord
 } from './persistence/runStorage.js';
+import { createModelLibrary } from './ui/modelLibrary.js';
 
 const canvas = document.querySelector('#viewport');
 const statusMessage = document.querySelector('#status-message');
@@ -39,6 +44,7 @@ const generationSummaryNodes = {
   upright: document.querySelector('#generation-summary-upright'),
   runtime: document.querySelector('#generation-summary-runtime')
 };
+const modelLibraryContainer = document.querySelector('#model-library');
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -53,10 +59,21 @@ let latestBestIndividual = null;
 let activeRunConfig = null;
 let activeRunTotalGenerations = 0;
 let generationViewer = null;
+let modelLibrary = null;
+let savedModelRecords = listModelRecords();
+let workerReady = false;
+let physicsRunning = false;
+let sharedStateEnabled = false;
+let lastHeightLog = 0;
+let sensorLogTimestamp = 0;
+let evolutionAbortController = null;
 
 function updatePreviewButtonState() {
   if (previewBestButton) {
     previewBestButton.disabled = !latestBestIndividual;
+  }
+  if (modelLibrary) {
+    modelLibrary.setHasModelAvailable(Boolean(latestBestIndividual));
   }
 }
 
@@ -356,6 +373,71 @@ if (
   });
 }
 
+if (modelLibraryContainer) {
+  modelLibrary = createModelLibrary({ container: modelLibraryContainer });
+  modelLibrary.setHasModelAvailable(Boolean(latestBestIndividual));
+  modelLibrary.setModels(savedModelRecords);
+  modelLibrary.onSave((name) => {
+    if (!latestBestIndividual) {
+      updateStatus('No evolved individual to save yet.');
+      return;
+    }
+    const sourceConfig = persistedRunState?.config
+      ? deepClone(persistedRunState.config)
+      : deepClone(evolutionPanel.getConfig());
+    const record = saveModelRecord({
+      name,
+      individual: latestBestIndividual,
+      config: sourceConfig ?? null
+    });
+    if (!record) {
+      updateStatus('Failed to save model — local storage may be unavailable.');
+      return;
+    }
+    savedModelRecords = listModelRecords();
+    modelLibrary.setModels(savedModelRecords);
+    modelLibrary.setSelectedId(record.id);
+    modelLibrary.clearName();
+    updateStatus(`Saved model "${record.name}".`);
+  });
+  modelLibrary.onLoad((id) => {
+    const record = loadModelRecord(id);
+    if (!record) {
+      updateStatus('Unable to load the selected model.');
+      return;
+    }
+    setLatestBestIndividual(record.individual);
+    if (record.config) {
+      applyConfigToForm(record.config);
+    }
+    savedModelRecords = listModelRecords();
+    modelLibrary.setModels(savedModelRecords);
+    modelLibrary.setSelectedId(id);
+    previewIndividual(record.individual, {
+      message: `Loaded model "${record.name}". Previewing in physics viewer…`
+    });
+  });
+  modelLibrary.onDelete((id) => {
+    const record = savedModelRecords.find((entry) => entry.id === id) ?? loadModelRecord(id);
+    const label = record?.name ?? 'saved model';
+    let confirmed = true;
+    if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+      confirmed = window.confirm(`Delete ${label}? This action cannot be undone.`);
+    }
+    if (!confirmed) {
+      return;
+    }
+    if (!deleteModelRecord(id)) {
+      updateStatus('Failed to delete the selected model.');
+      return;
+    }
+    savedModelRecords = listModelRecords();
+    modelLibrary.setModels(savedModelRecords);
+    modelLibrary.setHasModelAvailable(Boolean(latestBestIndividual));
+    updateStatus(`Deleted model "${label}".`);
+  });
+}
+
 if (persistedRunState) {
   applySavedRunStateToUi(persistedRunState);
   const resumeTotal =
@@ -394,23 +476,11 @@ const physicsWorker = new Worker(new URL('../workers/physics.worker.js', import.
 
 if (previewBestButton) {
   previewBestButton.addEventListener('click', () => {
-    if (!latestBestIndividual) {
-      return;
-    }
-    updateStatus('Previewing best individual in physics viewer…');
-    physicsWorker.postMessage({
-      type: 'preview-individual',
-      individual: deepClone(latestBestIndividual)
+    previewIndividual(latestBestIndividual, {
+      message: 'Previewing best individual in physics viewer…'
     });
   });
 }
-
-let workerReady = false;
-let physicsRunning = false;
-let sharedStateEnabled = false;
-let lastHeightLog = 0;
-let sensorLogTimestamp = 0;
-let evolutionAbortController = null;
 
 function updateStatus(message) {
   if (statusMessage) {
@@ -421,6 +491,29 @@ function updateStatus(message) {
 function setPhysicsRunning(next) {
   physicsRunning = Boolean(next);
   viewControls.setSimulationRunning(physicsRunning);
+}
+
+function previewIndividual(individual, { message } = {}) {
+  if (!individual) {
+    updateStatus('No evolved individual available for preview yet.');
+    return;
+  }
+  if (!workerReady) {
+    updateStatus('Physics worker is still initializing. Please try again once ready.');
+    return;
+  }
+  const clone = deepClone(individual);
+  if (!clone) {
+    updateStatus('Unable to prepare the individual for preview.');
+    return;
+  }
+  if (message) {
+    updateStatus(message);
+  }
+  physicsWorker.postMessage({
+    type: 'preview-individual',
+    individual: clone
+  });
 }
 
 viewControls.onSimulationToggle(() => {

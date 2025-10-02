@@ -4,7 +4,12 @@ import {
   clearRunState,
   saveReplayRecord,
   loadReplayRecord,
-  clearReplayRecord
+  clearReplayRecord,
+  saveModelRecord,
+  loadModelRecord,
+  listModelRecords,
+  deleteModelRecord,
+  clearModelRecords
 } from '../public/persistence/runStorage.js';
 
 function createMockStorage() {
@@ -59,5 +64,43 @@ describe('runStorage', () => {
     expect(decoded).toBe(payload);
     clearReplayRecord({ storage });
     expect(loadReplayRecord({ storage })).toBeNull();
+  });
+
+  test('saves, lists, and loads named model records', () => {
+    const storage = createMockStorage();
+    const individual = { id: 'best-1', morph: { blocks: 4 }, controller: { neurons: 12 } };
+    const config = { seed: 7, generations: 5 };
+    const saved = saveModelRecord({ name: 'Demo Creature', individual, config }, { storage });
+    expect(saved).toBeTruthy();
+    expect(saved.id).toBeTruthy();
+    const listed = listModelRecords({ storage });
+    expect(listed).toHaveLength(1);
+    expect(listed[0].name).toBe('Demo Creature');
+    expect(listed[0].individual).not.toBe(individual);
+    expect(listed[0].individual).toEqual(individual);
+    const loaded = loadModelRecord(saved.id, { storage });
+    expect(loaded?.config).toEqual(config);
+    expect(loaded?.individual).toEqual(individual);
+  });
+
+  test('saving with an existing name updates the entry', () => {
+    const storage = createMockStorage();
+    saveModelRecord({ name: 'Lecture', individual: { id: 'first' } }, { storage });
+    const updated = saveModelRecord({ name: 'lecture', individual: { id: 'second' } }, { storage });
+    expect(updated).toBeTruthy();
+    const listed = listModelRecords({ storage });
+    expect(listed).toHaveLength(1);
+    expect(listed[0].individual.id).toBe('second');
+  });
+
+  test('deleteModelRecord removes stored models', () => {
+    const storage = createMockStorage();
+    const record = saveModelRecord({ name: 'To Remove', individual: { id: 1 } }, { storage });
+    expect(listModelRecords({ storage })).toHaveLength(1);
+    expect(deleteModelRecord(record.id, { storage })).toBe(true);
+    expect(listModelRecords({ storage })).toHaveLength(0);
+    saveModelRecord({ name: 'Another', individual: { id: 2 } }, { storage });
+    expect(clearModelRecords({ storage })).toBe(true);
+    expect(listModelRecords({ storage })).toHaveLength(0);
   });
 });
