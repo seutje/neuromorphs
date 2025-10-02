@@ -26,6 +26,13 @@ function parseWeight(value, fallback) {
   return Math.max(number, 0);
 }
 
+function normalizeMutationValue(value) {
+  const sanitized =
+    typeof value === 'string' ? value.replace(/,/g, '.').trim() : value;
+  const number = clamp01(parseFloatValue(sanitized, 0));
+  return Math.round(number * 100) / 100;
+}
+
 export function createEvolutionPanel({
   form,
   button,
@@ -47,6 +54,60 @@ export function createEvolutionPanel({
   const meanNode = stats?.mean ?? document.querySelector('#stat-mean');
 
   const inputs = Array.from(form.querySelectorAll('input, select'));
+
+  const mutationValueInputs = Array.from(
+    form.querySelectorAll('input[data-sync-source]')
+  );
+
+  mutationValueInputs.forEach((field) => {
+    const key = field.dataset.syncSource;
+    if (!key) {
+      return;
+    }
+    const slider = form.querySelector(`input[data-sync-target="${key}"]`);
+    if (!slider) {
+      return;
+    }
+
+    const syncFromSlider = () => {
+      const normalized = normalizeMutationValue(slider.value);
+      slider.value = normalized;
+      field.value = normalized.toFixed(2);
+    };
+
+    const syncFromField = (commit = false) => {
+      if (field.value === '') {
+        if (commit) {
+          const normalized = normalizeMutationValue(0);
+          slider.value = normalized;
+          field.value = normalized.toFixed(2);
+        }
+        return;
+      }
+      const normalized = normalizeMutationValue(field.value);
+      slider.value = normalized;
+      field.value = normalized.toFixed(2);
+    };
+
+    slider.addEventListener('input', () => {
+      const normalized = normalizeMutationValue(slider.value);
+      field.value = normalized.toFixed(2);
+    });
+
+    slider.addEventListener('change', syncFromSlider);
+
+    field.addEventListener('input', () => {
+      if (field.value === '') {
+        return;
+      }
+      const normalized = normalizeMutationValue(field.value);
+      slider.value = normalized;
+    });
+
+    field.addEventListener('change', () => syncFromField(true));
+
+    syncFromField(true);
+  });
   let running = false;
   let currentGeneration = 0;
   let generationTarget = 1;

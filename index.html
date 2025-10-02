@@ -79,71 +79,149 @@
           <div class="config-column">
             <fieldset>
               <legend>Morph Mutation</legend>
-              <label for="config-morph-add">Add Limb Chance</label>
-              <input
-                id="config-morph-add"
-                name="morphAddLimbChance"
-                type="number"
-                min="0"
-                max="1"
-                step="0.05"
-                value="0.35"
-              />
-              <label for="config-morph-resize">Resize Chance</label>
-              <input
-                id="config-morph-resize"
-                name="morphResizeChance"
-                type="number"
-                min="0"
-                max="1"
-                step="0.05"
-                value="0.85"
-              />
-              <label for="config-morph-joint">Joint Jitter Chance</label>
-              <input
-                id="config-morph-joint"
-                name="morphJointJitterChance"
-                type="number"
-                min="0"
-                max="1"
-                step="0.05"
-                value="0.65"
-              />
+              <label id="label-morph-add" for="config-morph-add">Add Limb Chance</label>
+              <div class="mutation-slider">
+                <input
+                  id="config-morph-add-slider"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value="0.35"
+                  data-sync-target="morphAddLimbChance"
+                  aria-labelledby="label-morph-add"
+                />
+                <input
+                  id="config-morph-add"
+                  name="morphAddLimbChance"
+                  type="text"
+                  value="0.35"
+                  data-sync-source="morphAddLimbChance"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
+              <label id="label-morph-resize" for="config-morph-resize">Resize Chance</label>
+              <div class="mutation-slider">
+                <input
+                  id="config-morph-resize-slider"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value="0.85"
+                  data-sync-target="morphResizeChance"
+                  aria-labelledby="label-morph-resize"
+                />
+                <input
+                  id="config-morph-resize"
+                  name="morphResizeChance"
+                  type="text"
+                  value="0.85"
+                  data-sync-source="morphResizeChance"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
+              <label id="label-morph-joint" for="config-morph-joint">Joint Jitter Chance</label>
+              <div class="mutation-slider">
+                <input
+                  id="config-morph-joint-slider"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value="0.65"
+                  data-sync-target="morphJointJitterChance"
+                  aria-labelledby="label-morph-joint"
+                />
+                <input
+                  id="config-morph-joint"
+                  name="morphJointJitterChance"
+                  type="text"
+                  value="0.65"
+                  data-sync-source="morphJointJitterChance"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
             </fieldset>
           </div>
           <div class="config-column">
             <fieldset>
               <legend>Controller Mutation</legend>
-              <label for="config-ctrl-weight">Weight Jitter Chance</label>
-              <input
-                id="config-ctrl-weight"
-                name="controllerWeightChance"
-                type="number"
-                min="0"
-                max="1"
-                step="0.05"
-                value="0.85"
-              />
-              <label for="config-ctrl-osc">Oscillator Tune Chance</label>
-              <input
-                id="config-ctrl-osc"
-                name="controllerOscillatorChance"
-                type="number"
-                min="0"
-                max="1"
-                step="0.05"
-                value="0.6"
-              />
-              <label for="config-ctrl-conn">Add Connection Chance</label>
-              <input
-                id="config-ctrl-conn"
-                name="controllerAddConnectionChance"
-                type="number"
-                min="0"
-                max="1"
-                step="0.05"
-                value="0.45"
-              />
+              <label id="label-ctrl-weight" for="config-ctrl-weight">Weight Jitter Chance</label>
+              <div class="mutation-slider">
+                <input
+                  id="config-ctrl-weight-slider"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value="0.85"
+                  data-sync-target="controllerWeightChance"
+                  aria-labelledby="label-ctrl-weight"
+                />
+                <input
+                  id="config-ctrl-weight"
+                  name="controllerWeightChance"
+                  type="text"
+                  value="0.85"
+                  data-sync-source="controllerWeightChance"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
+              <label id="label-ctrl-osc" for="config-ctrl-osc">Oscillator Tune Chance</label>
+              <div class="mutation-slider">
+                <input
+                  id="config-ctrl-osc-slider"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value="0.6"
+                  data-sync-target="controllerOscillatorChance"
+                  aria-labelledby="label-ctrl-osc"
+                />
+                <input
+                  id="config-ctrl-osc"
+                  name="controllerOscillatorChance"
+                  type="text"
+                  value="0.6"
+                  data-sync-source="controllerOscillatorChance"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
+              <label id="label-ctrl-conn" for="config-ctrl-conn">Add Connection Chance</label>
+              <div class="mutation-slider">
+                <input
+                  id="config-ctrl-conn-slider"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value="0.45"
+                  data-sync-target="controllerAddConnectionChance"
+                  aria-labelledby="label-ctrl-conn"
+                />
+                <input
+                  id="config-ctrl-conn"
+                  name="controllerAddConnectionChance"
+                  type="text"
+                  value="0.45"
+                  data-sync-source="controllerAddConnectionChance"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
             </fieldset>
           </div>
           <div class="config-column">

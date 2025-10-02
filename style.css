@@ -213,6 +213,28 @@ h2 {
   font-weight: 500;
 }
 
+.mutation-slider {
+  display: grid;
+  grid-template-columns: 1fr minmax(3.25rem, 4.5rem);
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.mutation-slider input[type='range'] {
+  padding: 0;
+  background: transparent;
+  border: none;
+  height: 2px;
+}
+
+.mutation-slider input[data-sync-source] {
+  text-align: right;
+}
+
+.mutation-slider input[type='range']:focus {
+  outline: none;
+}
+
 .run-summary {
   display: flex;
   flex-direction: column;
