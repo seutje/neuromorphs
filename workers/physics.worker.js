@@ -507,7 +507,8 @@ function instantiateCreature(morphGenome, controllerGenome, options = {}) {
         w: descriptor.rotation[3]
       })
       .setLinearDamping(descriptor.linearDamping ?? 0.05)
-      .setAngularDamping(descriptor.angularDamping ?? 0.08);
+      .setAngularDamping(descriptor.angularDamping ?? 0.08)
+      .setCcdEnabled(true);
 
     const rigidBody = world.createRigidBody(bodyDesc);
     const colliderDesc = RAPIER.ColliderDesc.cuboid(
@@ -812,6 +813,37 @@ async function initializeWorld() {
     const gravity = new RAPIER.Vector3(0, -9.81, 0);
     world = new RAPIER.World(gravity);
     world.timestep = 1 / 60;
+
+    const integrationParameters = world.integrationParameters;
+    if (integrationParameters) {
+      integrationParameters.dt = world.timestep;
+      integrationParameters.maxVelocityIterations = Math.max(
+        integrationParameters.maxVelocityIterations ?? 4,
+        8
+      );
+      integrationParameters.maxPositionIterations = Math.max(
+        integrationParameters.maxPositionIterations ?? 1,
+        4
+      );
+      integrationParameters.maxCcdSubsteps = Math.max(
+        integrationParameters.maxCcdSubsteps ?? 1,
+        2
+      );
+      if (typeof integrationParameters.rigidBodyMaxCcdSubsteps === 'number') {
+        integrationParameters.rigidBodyMaxCcdSubsteps = Math.max(
+          integrationParameters.rigidBodyMaxCcdSubsteps,
+          2
+        );
+      }
+      integrationParameters.allowedLinearError = Math.min(
+        integrationParameters.allowedLinearError ?? 0.02,
+        0.002
+      );
+      integrationParameters.predictionDistance = Math.min(
+        integrationParameters.predictionDistance ?? 0.1,
+        0.02
+      );
+    }
 
     const floorCollider = RAPIER.ColliderDesc.cuboid(
       ARENA_HALF_EXTENTS.x,
