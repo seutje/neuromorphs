@@ -1,4 +1,4 @@
-export const ARENA_HALF_EXTENTS = { x: 12, y: 0.1, z: 9 };
+export const ARENA_HALF_EXTENTS = { x: 20, y: 0.1, z: 9 };
 export const ARENA_FLOOR_Y = -0.6;
 export const ARENA_SIZE = {
   width: ARENA_HALF_EXTENTS.x * 2,
@@ -9,7 +9,7 @@ export const ARENA_SIZE = {
 export const OBJECTIVE_HALF_EXTENTS = { x: 0.4, y: 0.4, z: 0.4 };
 export const OBJECTIVE_COLOR = '#22c55e';
 export const OBJECTIVE_POSITION = {
-  x: -8,
+  x: -16,
   y: ARENA_FLOOR_Y + ARENA_HALF_EXTENTS.y + OBJECTIVE_HALF_EXTENTS.y,
   z: 0
 };

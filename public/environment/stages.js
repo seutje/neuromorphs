@@ -4,7 +4,7 @@ export const DEFAULT_STAGE_ID = 'dash';
 
 const obstacleHalfExtents = { x: 0.9, y: 0.8, z: 1.8 };
 const obstaclePosition = {
-  x: -4,
+  x: -8,
   y: ARENA_FLOOR_Y + ARENA_HALF_EXTENTS.y + obstacleHalfExtents.y,
   z: 0
 };
