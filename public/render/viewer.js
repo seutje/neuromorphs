@@ -51,6 +51,26 @@ export function createViewer(canvas) {
   controls.autoRotate = false;
   controls.target.set(0, 0.6, 0);
 
+  canvas.addEventListener(
+    'wheel',
+    (event) => {
+      if (event.ctrlKey) {
+        event.preventDefault();
+        return;
+      }
+      controls.enableZoom = false;
+      const restoreZoom = () => {
+        controls.enableZoom = true;
+      };
+      if (typeof queueMicrotask === 'function') {
+        queueMicrotask(restoreZoom);
+      } else {
+        Promise.resolve().then(restoreZoom);
+      }
+    },
+    { passive: false }
+  );
+
   const ambient = new AmbientLight('#e2e8f0', 0.6);
   const keyLight = new DirectionalLight('#60a5fa', 0.85);
   keyLight.position.set(6, 6.5, 4);
