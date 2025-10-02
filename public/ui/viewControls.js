@@ -1,6 +1,12 @@
 const noop = () => {};
 
-export function createViewControls({ select, button, stageSelect, stageButton } = {}) {
+export function createViewControls({
+  select,
+  button,
+  stageSelect,
+  stageButton,
+  stageClearButton
+} = {}) {
   if (!select) {
     throw new Error('createViewControls requires a select element.');
   }
@@ -13,6 +19,9 @@ export function createViewControls({ select, button, stageSelect, stageButton } 
   if (!stageButton) {
     throw new Error('createViewControls requires a stage load button.');
   }
+  if (!stageClearButton) {
+    throw new Error('createViewControls requires a stage clear button.');
+  }
 
   let currentMode = select.value || 'orbit';
   let simulationRunning = true;
@@ -21,6 +30,7 @@ export function createViewControls({ select, button, stageSelect, stageButton } 
   const toggleListeners = new Set();
   const stageChangeListeners = new Set();
   const stageLoadListeners = new Set();
+  const stageClearListeners = new Set();
 
   select.addEventListener('change', () => {
     currentMode = select.value || 'orbit';
@@ -38,6 +48,10 @@ export function createViewControls({ select, button, stageSelect, stageButton } 
 
   stageButton.addEventListener('click', () => {
     stageLoadListeners.forEach((listener) => listener(currentStage));
+  });
+
+  stageClearButton.addEventListener('click', () => {
+    stageClearListeners.forEach((listener) => listener(currentStage));
   });
 
   function setViewMode(mode) {
@@ -107,6 +121,12 @@ export function createViewControls({ select, button, stageSelect, stageButton } 
         stageLoadListeners.add(callback);
       }
       return () => stageLoadListeners.delete(callback);
+    },
+    onStageClear(callback = noop) {
+      if (typeof callback === 'function') {
+        stageClearListeners.add(callback);
+      }
+      return () => stageClearListeners.delete(callback);
     },
     setViewMode,
     setSimulationRunning,

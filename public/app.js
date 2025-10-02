@@ -29,6 +29,7 @@ const viewModeSelect = document.querySelector('#view-mode');
 const simulationToggleButton = document.querySelector('#simulation-toggle');
 const stageSelect = document.querySelector('#stage-select');
 const loadStageButton = document.querySelector('#load-stage');
+const clearStageButton = document.querySelector('#clear-stage');
 const evolutionForm = document.querySelector('#evolution-config');
 const evolutionStartButton = document.querySelector('#evolution-start');
 const previewBestButton = document.querySelector('#preview-best');
@@ -117,6 +118,15 @@ function loadStage(stageId, { announce = true } = {}) {
   if (physicsWorker && workerReady) {
     physicsWorker.postMessage({ type: 'load-stage', stageId: stage.id });
   }
+}
+
+function clearStageModels() {
+  if (!physicsWorker || !workerReady) {
+    updateStatus('Physics worker is still initializing. Please try again once ready.');
+    return;
+  }
+  updateStatus('Clearing models from the stage…');
+  physicsWorker.postMessage({ type: 'clear-stage-models' });
 }
 
 function applyStageFromConfig(config, { announce = false } = {}) {
@@ -414,7 +424,8 @@ viewControls = createViewControls({
   select: viewModeSelect,
   button: simulationToggleButton,
   stageSelect,
-  stageButton: loadStageButton
+  stageButton: loadStageButton,
+  stageClearButton: clearStageButton
 });
 const availableStages = listStages();
 viewControls.setStages(availableStages);
@@ -426,6 +437,9 @@ const defaultStage = getStageDefinition(activeStageId);
 queuedStageId = defaultStage.id;
 viewControls.onStageLoad((stageId) => {
   loadStage(stageId);
+});
+viewControls.onStageClear(() => {
+  clearStageModels();
 });
 loadStage(activeStageId, { announce: false });
 evolutionPanel = createEvolutionPanel({
@@ -773,6 +787,8 @@ physicsWorker.addEventListener('message', (event) => {
     }
     const label = stage.label ?? stage.id;
     updateStatus(`${label} stage ready. Simulation reset.`);
+  } else if (data.type === 'stage-cleared') {
+    updateStatus('Cleared all models from the stage.');
   } else if (data.type === 'stage-error') {
     console.error('Stage load failed:', data.message);
     updateStatus('Unable to load the requested stage.');
