@@ -235,10 +235,11 @@ export function createViewer(canvas) {
       : [];
 
     sharedDescriptorMap = descriptorMap;
-    primaryBodyId = bodyIds[0] ?? primaryBodyId;
+    primaryBodyId = bodyIds[0] ?? null;
+    const hasDescriptors = descriptorMap.size > 0;
 
     sharedBodyMeshes.forEach((mesh, id) => {
-      mesh.visible = descriptorMap.size === 0 ? mesh.visible : descriptorMap.has(id);
+      mesh.visible = hasDescriptors ? descriptorMap.has(id) : false;
     });
   }
 

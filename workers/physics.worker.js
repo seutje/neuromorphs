@@ -1050,6 +1050,16 @@ self.addEventListener('message', (event) => {
       setRunning(true);
     }
     postMessage({ type: 'stage-loaded', stageId: stage.id });
+  } else if (data.type === 'clear-stage-models') {
+    const wasRunning = running;
+    if (wasRunning) {
+      setRunning(false);
+    }
+    stopReplayPlayback({ notify: false });
+    clearCreature();
+    configureSharedState([], {});
+    syncSharedState();
+    postMessage({ type: 'stage-cleared' });
   } else if (data.type === 'preview-individual') {
     const individual =
       data.individual && typeof data.individual === 'object' ? data.individual : null;
