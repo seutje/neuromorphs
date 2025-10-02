@@ -9,6 +9,7 @@ import {
   resolveSelectionWeights
 } from './evolution/fitness.js';
 import { DEFAULT_STAGE_ID, getStageDefinition, listStages } from './environment/stages.js';
+import { deepClone, resolveResumeState, runConfigsMatch } from './evolution/runState.js';
 import {
   saveRunState,
   loadRunState,
@@ -58,10 +59,6 @@ const DEFAULT_MODEL_URL = new URL('../models/catdog.json', import.meta.url);
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
-
-function deepClone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
 
 let persistedRunState = loadRunState() ?? null;
 let latestReplay = loadReplayRecord() ?? null;
@@ -394,6 +391,13 @@ function storeReplay(buffer, metadata) {
   }
 }
 
+function resolveAbortedResumeState(config) {
+  if (!config) {
+    return null;
+  }
+  return resolveResumeState(persistedRunState, config);
+}
+
 function applySavedRunStateToUi(state) {
   if (!state) {
     generationViewer?.reset();
@@ -442,13 +446,22 @@ async function executeEvolutionRun({ config, resumeState = null, resetStats = tr
         ? objectiveToSelectionWeights(config.selectionObjective)
         : DEFAULT_SELECTION_WEIGHTS)
   );
-  if (!resumeState) {
+  if (resumeState) {
+    if (persistedRunState && runConfigsMatch(persistedRunState.config, config)) {
+      const runningState = {
+        ...persistedRunState,
+        status: 'running',
+        updatedAt: Date.now()
+      };
+      saveRunState(runningState);
+      persistedRunState = runningState;
+    }
+    generationViewer?.jumpToLatest({ silent: true });
+  } else {
     clearRunState();
     persistedRunState = null;
     generationViewer?.reset();
     setLatestBestIndividual(null);
-  } else {
-    generationViewer?.jumpToLatest({ silent: true });
   }
   if (resetStats) {
     evolutionPanel.resetStats();
@@ -907,7 +920,21 @@ physicsWorker.addEventListener('message', (event) => {
 
 evolutionPanel.onStart((config) => {
   const runConfig = { ...config, stageId: activeStageId };
-  executeEvolutionRun({ config: runConfig, resetStats: true });
+  const resumeState = resolveAbortedResumeState(runConfig);
+  if (resumeState) {
+    updateStatus('Resuming aborted evolution run…');
+  } else if (
+    persistedRunState?.status === 'aborted' &&
+    persistedRunState.config &&
+    !runConfigsMatch(persistedRunState.config, runConfig)
+  ) {
+    updateStatus('Starting a new evolution run. Previous progress will be cleared.');
+  }
+  executeEvolutionRun({
+    config: runConfig,
+    resumeState: resumeState ?? null,
+    resetStats: !resumeState
+  });
 });
 
 evolutionPanel.onStop(() => {
