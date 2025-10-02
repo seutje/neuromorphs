@@ -104,7 +104,7 @@
               />
             </fieldset>
           </div>
-          <div class="config-column config-column--actions">
+          <div class="config-column">
             <fieldset>
               <legend>Controller Mutation</legend>
               <label for="config-ctrl-weight">Weight Jitter Chance</label>
@@ -138,6 +138,9 @@
                 value="0.45"
               />
             </fieldset>
+          </div>
+          <section class="run-summary" aria-labelledby="run-summary-heading">
+            <h3 id="run-summary-heading" class="run-summary__title">Run Controls &amp; Stats</h3>
             <div class="run-controls">
               <button id="evolution-start" type="button">Start Evolution</button>
               <button id="preview-best" type="button" disabled>Preview Best</button>
@@ -162,139 +165,139 @@
                 <dd id="stat-mean">—</dd>
               </div>
             </dl>
-            <fieldset id="model-library" class="model-library" data-model-library>
-              <legend>Saved Models</legend>
-              <label for="model-name">Model name</label>
-              <div class="model-library__save">
-                <input
-                  id="model-name"
-                  name="modelName"
-                  type="text"
-                  placeholder="e.g., Lecture demo"
-                  maxlength="120"
-                  data-model-name
-                />
-                <button id="model-save" type="button" data-model-save disabled>Save Model</button>
-              </div>
-              <p class="model-library__hint">
-                Store the current best individual with a custom label for later preview.
+          </section>
+          <fieldset id="model-library" class="model-library" data-model-library>
+            <legend>Saved Models</legend>
+            <label for="model-name">Model name</label>
+            <div class="model-library__save">
+              <input
+                id="model-name"
+                name="modelName"
+                type="text"
+                placeholder="e.g., Lecture demo"
+                maxlength="120"
+                data-model-name
+              />
+              <button id="model-save" type="button" data-model-save disabled>Save Model</button>
+            </div>
+            <p class="model-library__hint">
+              Store the current best individual with a custom label for later preview.
+            </p>
+            <div class="model-library__list">
+              <label class="model-library__label" for="model-list">Saved entries</label>
+              <select
+                id="model-list"
+                class="model-library__select"
+                size="4"
+                data-model-list
+                aria-label="Saved models"
+              ></select>
+              <p id="model-empty" class="model-library__empty" role="status" data-model-empty>
+                No saved models yet.
               </p>
-              <div class="model-library__list">
-                <label class="model-library__label" for="model-list">Saved entries</label>
-                <select
-                  id="model-list"
-                  class="model-library__select"
-                  size="4"
-                  data-model-list
-                  aria-label="Saved models"
-                ></select>
-                <p id="model-empty" class="model-library__empty" role="status" data-model-empty>
-                  No saved models yet.
+            </div>
+            <div class="model-library__actions">
+              <button id="model-load" type="button" data-model-load disabled>Load</button>
+              <button
+                id="model-delete"
+                type="button"
+                class="model-library__delete"
+                data-model-delete
+                disabled
+              >
+                Delete
+              </button>
+            </div>
+          </fieldset>
+          <section
+            id="generation-viewer"
+            class="generation-viewer is-empty"
+            aria-label="Generation viewer"
+          >
+            <header class="generation-viewer__header">
+              <div>
+                <h3>Generation Viewer</h3>
+                <p class="generation-viewer__subtitle">
+                  Scrub through best-of generation stats or auto-play the evolution timeline.
                 </p>
               </div>
-              <div class="model-library__actions">
-                <button id="model-load" type="button" data-model-load disabled>Load</button>
+              <div class="generation-viewer__actions">
                 <button
-                  id="model-delete"
+                  id="generation-play"
+                  class="generation-viewer__button"
                   type="button"
-                  class="model-library__delete"
-                  data-model-delete
                   disabled
                 >
-                  Delete
+                  Play
+                </button>
+                <button
+                  id="generation-latest"
+                  class="generation-viewer__button generation-viewer__button--ghost"
+                  type="button"
+                  disabled
+                >
+                  Latest
                 </button>
               </div>
-            </fieldset>
-          </div>
-        </form>
-        <section
-          id="generation-viewer"
-          class="generation-viewer is-empty"
-          aria-label="Generation viewer"
-        >
-          <header class="generation-viewer__header">
-            <div>
-              <h3>Generation Viewer</h3>
-              <p class="generation-viewer__subtitle">
-                Scrub through best-of generation stats or auto-play the evolution timeline.
+            </header>
+            <label for="generation-slider" class="generation-viewer__label">Scrub generations</label>
+            <input
+              id="generation-slider"
+              class="generation-viewer__slider"
+              type="range"
+              min="0"
+              max="0"
+              step="1"
+              value="0"
+              disabled
+            />
+            <div class="generation-summary">
+              <div class="generation-summary__header">
+                <p class="generation-summary__title">
+                  Generation <span id="generation-summary-generation">—</span>
+                </p>
+                <span id="generation-summary-count" class="generation-summary__count">0 / 0</span>
+              </div>
+              <p class="generation-summary__fitness">
+                Best fitness <span id="generation-summary-best">—</span>
               </p>
+              <dl class="generation-summary__metrics">
+                <div>
+                  <dt>Mean fitness</dt>
+                  <dd id="generation-summary-mean">—</dd>
+                </div>
+                <div>
+                  <dt>Displacement</dt>
+                  <dd id="generation-summary-displacement">—</dd>
+                </div>
+                <div>
+                  <dt>Avg speed</dt>
+                  <dd id="generation-summary-speed">—</dd>
+                </div>
+                <div>
+                  <dt>Avg height</dt>
+                  <dd id="generation-summary-height">—</dd>
+                </div>
+                <div>
+                  <dt>Upright time</dt>
+                  <dd id="generation-summary-upright">—</dd>
+                </div>
+                <div>
+                  <dt>Runtime</dt>
+                  <dd id="generation-summary-runtime">—</dd>
+                </div>
+              </dl>
             </div>
-            <div class="generation-viewer__actions">
-              <button
-                id="generation-play"
-                class="generation-viewer__button"
-                type="button"
-                disabled
-              >
-                Play
-              </button>
-              <button
-                id="generation-latest"
-                class="generation-viewer__button generation-viewer__button--ghost"
-                type="button"
-                disabled
-              >
-                Latest
-              </button>
-            </div>
-          </header>
-          <label for="generation-slider" class="generation-viewer__label">Scrub generations</label>
-          <input
-            id="generation-slider"
-            class="generation-viewer__slider"
-            type="range"
-            min="0"
-            max="0"
-            step="1"
-            value="0"
-            disabled
-          />
-          <div class="generation-summary">
-            <div class="generation-summary__header">
-              <p class="generation-summary__title">
-                Generation <span id="generation-summary-generation">—</span>
-              </p>
-              <span id="generation-summary-count" class="generation-summary__count">0 / 0</span>
-            </div>
-            <p class="generation-summary__fitness">
-              Best fitness <span id="generation-summary-best">—</span>
+            <ol
+              id="generation-timeline"
+              class="generation-timeline"
+              aria-label="Best fitness per generation"
+            ></ol>
+            <p class="generation-viewer__empty" role="status">
+              Launch an evolution run to populate the timeline.
             </p>
-            <dl class="generation-summary__metrics">
-              <div>
-                <dt>Mean fitness</dt>
-                <dd id="generation-summary-mean">—</dd>
-              </div>
-              <div>
-                <dt>Displacement</dt>
-                <dd id="generation-summary-displacement">—</dd>
-              </div>
-              <div>
-                <dt>Avg speed</dt>
-                <dd id="generation-summary-speed">—</dd>
-              </div>
-              <div>
-                <dt>Avg height</dt>
-                <dd id="generation-summary-height">—</dd>
-              </div>
-              <div>
-                <dt>Upright time</dt>
-                <dd id="generation-summary-upright">—</dd>
-              </div>
-              <div>
-                <dt>Runtime</dt>
-                <dd id="generation-summary-runtime">—</dd>
-              </div>
-            </dl>
-          </div>
-          <ol
-            id="generation-timeline"
-            class="generation-timeline"
-            aria-label="Best fitness per generation"
-          ></ol>
-          <p class="generation-viewer__empty" role="status">
-            Launch an evolution run to populate the timeline.
-          </p>
-        </section>
+          </section>
+        </form>
       </section>
     </main>
     <footer class="site-footer">
