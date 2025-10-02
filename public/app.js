@@ -102,6 +102,11 @@ function applyConfigToForm(config) {
   assign('controllerWeightChance', config.controllerMutation?.weightJitterChance ?? 0.85);
   assign('controllerOscillatorChance', config.controllerMutation?.oscillatorChance ?? 0.6);
   assign('controllerAddConnectionChance', config.controllerMutation?.addConnectionChance ?? 0.45);
+  const selectionObjective =
+    config.selectionObjective === 'speed' || config.selectionObjective === 'upright'
+      ? config.selectionObjective
+      : 'distance';
+  assign('selectionObjective', selectionObjective);
 }
 
 function resolveBestMetrics(entry) {
@@ -302,6 +307,10 @@ async function executeEvolutionRun({ config, resumeState = null, resetStats = tr
         morph: config.morphMutation,
         controller: config.controllerMutation
       },
+      selectionObjective:
+        config.selectionObjective === 'speed' || config.selectionObjective === 'upright'
+          ? config.selectionObjective
+          : 'distance',
       resume: resumeState,
       signal: controller.signal,
       onGeneration: (entry) => {

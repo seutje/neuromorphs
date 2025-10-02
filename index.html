@@ -145,6 +145,14 @@
               <div class="run-controls">
                 <button id="evolution-start" type="button">Start Evolution</button>
                 <button id="preview-best" type="button" disabled>Preview Best</button>
+                <div class="run-controls__objective">
+                  <label for="config-selection-objective">Select for</label>
+                  <select id="config-selection-objective" name="selectionObjective">
+                    <option value="distance" selected>Distance</option>
+                    <option value="speed">Speed</option>
+                    <option value="upright">Upright</option>
+                  </select>
+                </div>
                 <progress
                   id="evolution-progress"
                   value="0"

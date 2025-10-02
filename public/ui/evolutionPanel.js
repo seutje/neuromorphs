@@ -16,6 +16,14 @@ function parseFloatValue(value, fallback) {
   return Number.isFinite(number) ? number : fallback;
 }
 
+function parseSelectionObjective(value) {
+  const normalized = typeof value === 'string' ? value.toLowerCase() : '';
+  if (normalized === 'speed' || normalized === 'upright') {
+    return normalized;
+  }
+  return 'distance';
+}
+
 export function createEvolutionPanel({
   form,
   button,
@@ -36,7 +44,7 @@ export function createEvolutionPanel({
   const bestNode = stats?.best ?? document.querySelector('#stat-best');
   const meanNode = stats?.mean ?? document.querySelector('#stat-mean');
 
-  const inputs = Array.from(form.querySelectorAll('input'));
+  const inputs = Array.from(form.querySelectorAll('input, select'));
   let running = false;
   let currentGeneration = 0;
   let generationTarget = 1;
@@ -57,6 +65,7 @@ export function createEvolutionPanel({
       seed: parseInteger(form.seed?.value, 42),
       populationSize: Math.max(4, parseInteger(form.populationSize?.value, 12)),
       generations: Math.max(1, parseInteger(form.generations?.value, 10)),
+      selectionObjective: parseSelectionObjective(form.selectionObjective?.value),
       morphMutation: {
         addLimbChance: clamp01(parseFloatValue(form.morphAddLimbChance?.value, 0.35)),
         resizeChance: clamp01(parseFloatValue(form.morphResizeChance?.value, 0.85)),

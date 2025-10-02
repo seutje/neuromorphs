@@ -156,6 +156,21 @@ export function computeLocomotionFitness(samples, options = {}) {
   };
 }
 
+export function scoreLocomotionByObjective(metrics, objective = 'distance') {
+  if (!metrics || typeof metrics !== 'object') {
+    return 0;
+  }
+  const normalized = typeof objective === 'string' ? objective.toLowerCase() : '';
+  if (normalized === 'speed') {
+    return Number.isFinite(metrics.averageSpeed) ? Math.max(metrics.averageSpeed, 0) : 0;
+  }
+  if (normalized === 'upright') {
+    const upright = Number.isFinite(metrics.fallFraction) ? 1 - metrics.fallFraction : null;
+    return upright !== null ? Math.max(upright, 0) : 0;
+  }
+  return Number.isFinite(metrics.displacement) ? Math.max(metrics.displacement, 0) : 0;
+}
+
 export function createFitnessAccumulator(options = {}) {
   const samples = [];
   return {

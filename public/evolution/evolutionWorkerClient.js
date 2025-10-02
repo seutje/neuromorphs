@@ -101,6 +101,7 @@ export function runEvolutionInWorker({
   seed,
   startGeneration = 0,
   history = [],
+  selectionObjective = 'distance',
   simulation,
   onGeneration,
   onStateSnapshot,
@@ -148,6 +149,7 @@ export function runEvolutionInWorker({
         rngState,
         startGeneration,
         history,
+        selectionObjective,
         simulation
       }
     });

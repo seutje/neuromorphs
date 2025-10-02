@@ -50,6 +50,7 @@ export async function runEvolutionDemo(options = {}) {
     onStateSnapshot,
     resume,
     logger = console,
+    selectionObjective = 'distance',
     simulationDuration = 60,
     simulationTimestep = 1 / 60,
     simulationSampleInterval = 1 / 30
@@ -131,6 +132,7 @@ export async function runEvolutionDemo(options = {}) {
     onStateSnapshot,
     startGeneration: resumeGeneration,
     history: resumeHistory,
+    selectionObjective,
     simulation: {
       duration: simulationDuration,
       timestep: simulationTimestep,

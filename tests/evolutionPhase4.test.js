@@ -3,6 +3,7 @@ import { createDefaultControllerGenome, validateControllerGenome } from '../geno
 import { mutateMorphGenome, mutateControllerGenome } from '../public/evolution/mutation.js';
 import { createRng } from '../public/evolution/rng.js';
 import { computeLocomotionFitness } from '../public/evolution/fitness.js';
+import { OBJECTIVE_POSITION } from '../public/environment/arena.js';
 import { runEvolution } from '../public/evolution/evolutionEngine.js';
 import { simulateLocomotion } from '../public/evolution/simulator.js';
 
@@ -106,13 +107,17 @@ describe('computeLocomotionFitness', () => {
   });
 
   it('adds an objective reward when moving closer to the target cube', () => {
+    const startX = 0;
+    const closerX = OBJECTIVE_POSITION.x + 1.5;
+    const fartherX = OBJECTIVE_POSITION.x + 14.5;
+
     const towardObjective = [
-      { timestamp: 0, centerOfMass: { x: 0, y: 0.8, z: 0 }, rootHeight: 0.8 },
-      { timestamp: 1, centerOfMass: { x: 6.5, y: 0.82, z: 0 }, rootHeight: 0.82 }
+      { timestamp: 0, centerOfMass: { x: startX, y: 0.8, z: 0 }, rootHeight: 0.8 },
+      { timestamp: 1, centerOfMass: { x: closerX, y: 0.82, z: 0 }, rootHeight: 0.82 }
     ];
     const awayFromObjective = [
-      { timestamp: 0, centerOfMass: { x: 0, y: 0.8, z: 0 }, rootHeight: 0.8 },
-      { timestamp: 1, centerOfMass: { x: -6.5, y: 0.82, z: 0 }, rootHeight: 0.82 }
+      { timestamp: 0, centerOfMass: { x: startX, y: 0.8, z: 0 }, rootHeight: 0.8 },
+      { timestamp: 1, centerOfMass: { x: fartherX, y: 0.82, z: 0 }, rootHeight: 0.82 }
     ];
 
     const towardFitness = computeLocomotionFitness(towardObjective);
