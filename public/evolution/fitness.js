@@ -160,15 +160,28 @@ export function scoreLocomotionByObjective(metrics, objective = 'distance') {
   if (!metrics || typeof metrics !== 'object') {
     return 0;
   }
+
+  const displacement = Number.isFinite(metrics.displacement)
+    ? Math.max(metrics.displacement, 0)
+    : 0;
+  const averageSpeed = Number.isFinite(metrics.averageSpeed)
+    ? Math.max(metrics.averageSpeed, 0)
+    : 0;
+  const uprightScore = Number.isFinite(metrics.fallFraction)
+    ? Math.max(1 - metrics.fallFraction, 0)
+    : 0;
+  const baseFitness = Number.isFinite(metrics.fitness) && metrics.fitness > 0
+    ? Math.max(metrics.fitness, 0)
+    : displacement + averageSpeed * 0.5;
+
   const normalized = typeof objective === 'string' ? objective.toLowerCase() : '';
   if (normalized === 'speed') {
-    return Number.isFinite(metrics.averageSpeed) ? Math.max(metrics.averageSpeed, 0) : 0;
+    return Math.max(baseFitness + averageSpeed, 0);
   }
   if (normalized === 'upright') {
-    const upright = Number.isFinite(metrics.fallFraction) ? 1 - metrics.fallFraction : null;
-    return upright !== null ? Math.max(upright, 0) : 0;
+    return Math.max(baseFitness + uprightScore * baseFitness, 0);
   }
-  return Number.isFinite(metrics.displacement) ? Math.max(metrics.displacement, 0) : 0;
+  return Math.max(baseFitness + displacement * 0.5, 0);
 }
 
 export function createFitnessAccumulator(options = {}) {
