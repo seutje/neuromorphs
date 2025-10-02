@@ -66,6 +66,12 @@ export async function runEvolutionDemo(options = {}) {
   const totalGenerations = Math.max(0, generations);
   const remainingGenerations = Math.max(0, totalGenerations - resumeGeneration);
 
+  if (logger && typeof logger.info === 'function') {
+    logger.info(
+      `[demo] starting evolution with ${remainingGenerations} generation(s) remaining (resume generation: ${resumeGeneration}).`
+    );
+  }
+
   const rng = createRng(resumeState?.rngState ?? seed);
   const baseMorph = options.baseMorph ?? createDefaultMorphGenome();
   const baseController = options.baseController ?? createDefaultControllerGenome();
