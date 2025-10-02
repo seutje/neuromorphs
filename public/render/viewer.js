@@ -54,13 +54,16 @@ export function createViewer(canvas) {
   canvas.addEventListener(
     'wheel',
     (event) => {
+      const previousEnableZoom = controls.enableZoom;
       const allowZoom = event.ctrlKey;
       controls.enableZoom = allowZoom;
       if (allowZoom) {
         event.preventDefault();
+      } else {
+        event.stopImmediatePropagation();
       }
       const restoreZoom = () => {
-        controls.enableZoom = true;
+        controls.enableZoom = previousEnableZoom;
       };
       if (typeof queueMicrotask === 'function') {
         queueMicrotask(restoreZoom);
