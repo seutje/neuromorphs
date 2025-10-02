@@ -22,7 +22,7 @@ export function createModelLibrary({ container } = {}) {
   const nameInput = container.querySelector('[data-model-name]');
   const saveButton = container.querySelector('[data-model-save]');
   const list = container.querySelector('[data-model-list]');
-  const loadButton = container.querySelector('[data-model-load]');
+  const addButton = container.querySelector('[data-model-add]');
   const exportButton = container.querySelector('[data-model-export]');
   const deleteButton = container.querySelector('[data-model-delete]');
   const emptyState = container.querySelector('[data-model-empty]');
@@ -31,7 +31,7 @@ export function createModelLibrary({ container } = {}) {
     !nameInput ||
     !saveButton ||
     !list ||
-    !loadButton ||
+    !addButton ||
     !exportButton ||
     !deleteButton ||
     !emptyState
@@ -44,7 +44,7 @@ export function createModelLibrary({ container } = {}) {
   let selectedId = null;
 
   const saveListeners = new Set();
-  const loadListeners = new Set();
+  const addListeners = new Set();
   const deleteListeners = new Set();
   const exportListeners = new Set();
   const selectListeners = new Set();
@@ -58,7 +58,7 @@ export function createModelLibrary({ container } = {}) {
     const selectedOption = list.selectedOptions?.[0] ?? null;
     selectedId = selectedOption ? selectedOption.value : null;
     const hasSelection = Boolean(selectedId);
-    loadButton.disabled = !hasSelection;
+    addButton.disabled = !hasSelection;
     exportButton.disabled = !hasSelection;
     deleteButton.disabled = !hasSelection;
     if (selectedOption) {
@@ -113,15 +113,15 @@ export function createModelLibrary({ container } = {}) {
 
   list.addEventListener('dblclick', () => {
     if (selectedId) {
-      loadListeners.forEach((listener) => listener(selectedId));
+      addListeners.forEach((listener) => listener(selectedId));
     }
   });
 
-  loadButton.addEventListener('click', () => {
+  addButton.addEventListener('click', () => {
     if (!selectedId) {
       return;
     }
-    loadListeners.forEach((listener) => listener(selectedId));
+    addListeners.forEach((listener) => listener(selectedId));
   });
 
   exportButton.addEventListener('click', () => {
@@ -148,11 +148,11 @@ export function createModelLibrary({ container } = {}) {
       }
       return () => saveListeners.delete(callback);
     },
-    onLoad(callback = noop) {
+    onAdd(callback = noop) {
       if (typeof callback === 'function') {
-        loadListeners.add(callback);
+        addListeners.add(callback);
       }
-      return () => loadListeners.delete(callback);
+      return () => addListeners.delete(callback);
     },
     onDelete(callback = noop) {
       if (typeof callback === 'function') {

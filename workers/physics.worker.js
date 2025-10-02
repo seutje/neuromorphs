@@ -33,7 +33,7 @@ const META_LENGTH = 2;
 const META_VERSION_INDEX = 0;
 const META_WRITE_LOCK_INDEX = 1;
 const FLOATS_PER_BODY = 7;
-const COLLISION_GROUP_CREATURE = createInteractionGroup(0b0001, 0xfffe);
+const COLLISION_GROUP_CREATURE = createInteractionGroup(0b0001, 0xffff);
 const COLLISION_GROUP_ENVIRONMENT = createInteractionGroup(0b0010, 0xffff);
 
 let world = null;
@@ -55,7 +55,9 @@ let bodyOrder = [];
 let bodyDescriptorsCache = [];
 let creatureJointDescriptors = [];
 let creatureJointMap = new Map();
-let controllerRuntime = null;
+let sharedMaterialMap = {};
+let additionalInstanceCount = 0;
+const controllerInstances = new Map();
 let replayRecorder = createReplayRecorder();
 let activeReplay = null;
 
@@ -108,6 +110,66 @@ function normalizeVector3({ x, y, z }) {
   return { x: x / length, y: y / length, z: z / length };
 }
 
+function computeInstanceOffset(index) {
+  if (!Number.isFinite(index) || index < 0) {
+    return { x: 0, y: 0, z: 0 };
+  }
+  const spacing = 3;
+  const step = Math.floor(index / 2) + 1;
+  const direction = index % 2 === 0 ? 1 : -1;
+  return { x: direction * step * spacing, y: 0, z: 0 };
+}
+
+function cloneControllerBlueprintForInstance(blueprint, prefix) {
+  if (!blueprint || typeof blueprint !== 'object') {
+    return null;
+  }
+  const clone = JSON.parse(JSON.stringify(blueprint));
+  if (Array.isArray(clone.nodes)) {
+    clone.nodes.forEach((node) => {
+      if (node?.source && typeof node.source === 'object' && typeof node.source.id === 'string' && prefix) {
+        node.source.id = `${prefix}${node.source.id}`;
+      }
+      if (node?.target && typeof node.target === 'object' && typeof node.target.id === 'string' && prefix) {
+        node.target.id = `${prefix}${node.target.id}`;
+      }
+    });
+    clone.sensors = clone.nodes.filter((node) => node?.type === 'sensor');
+    clone.actuators = clone.nodes.filter((node) => node?.type === 'actuator');
+  }
+  if (!Array.isArray(clone.connections)) {
+    clone.connections = [];
+  }
+  if (!Array.isArray(clone.errors)) {
+    clone.errors = [];
+  }
+  if (!clone.metadata || typeof clone.metadata !== 'object') {
+    clone.metadata = {};
+  }
+  return clone;
+}
+
+function collectControllerActuatorIds() {
+  const ids = new Set();
+  controllerInstances.forEach((instance, key) => {
+    const runtime = instance?.runtime;
+    if (!runtime || !Array.isArray(runtime.actuators)) {
+      return;
+    }
+    runtime.actuators.forEach((actuatorId) => {
+      if (typeof actuatorId !== 'string') {
+        return;
+      }
+      if (instance.prefix) {
+        ids.add(`${key}:${actuatorId}`);
+      } else {
+        ids.add(actuatorId);
+      }
+    });
+  });
+  return Array.from(ids);
+}
+
 function clearCreature() {
   if (!world) {
     return;
@@ -126,7 +188,9 @@ function clearCreature() {
   bodyDescriptorsCache = [];
   creatureJointDescriptors = [];
   creatureJointMap.clear();
-  controllerRuntime = null;
+  sharedMaterialMap = {};
+  additionalInstanceCount = 0;
+  controllerInstances.clear();
   replayRecorder.clear();
 }
 
@@ -191,7 +255,7 @@ function startReplayRecording() {
   }
   replayRecorder.start({
     jointDescriptors: creatureJointDescriptors,
-    actuatorIds: controllerRuntime?.actuators ?? [],
+    actuatorIds: collectControllerActuatorIds(),
     timestep: world.timestep ?? 1 / 60
   });
 }
@@ -369,13 +433,15 @@ function resetCreature() {
     entry.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     entry.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
   });
-  if (controllerRuntime) {
-    controllerRuntime.reset();
-  }
+  controllerInstances.forEach((instance) => {
+    if (instance?.runtime?.reset) {
+      instance.runtime.reset();
+    }
+  });
   syncSharedState();
 }
 
-function instantiateCreature(morphGenome, controllerGenome) {
+function instantiateCreature(morphGenome, controllerGenome, options = {}) {
   if (!world) {
     return false;
   }
@@ -389,19 +455,38 @@ function instantiateCreature(morphGenome, controllerGenome) {
     return false;
   }
 
-  clearCreature();
+  const { clearExisting = true, prefixIds = !clearExisting, offset = null } = options;
 
-  const materialMap = {};
+  if (clearExisting) {
+    clearCreature();
+  }
+
+  const isAdditional = Boolean(prefixIds);
+  const spawnOffset =
+    offset ?? (isAdditional ? computeInstanceOffset(additionalInstanceCount) : { x: 0, y: 0, z: 0 });
+  const prefixBase = isAdditional
+    ? `${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6)
+        .toString(36)
+        .slice(0, 4)}-`
+    : '';
+  const instanceKey = isAdditional ? prefixBase : 'primary';
+
+  const materialSource = clearExisting ? {} : { ...sharedMaterialMap };
   Object.entries(blueprint.materials).forEach(([key, value]) => {
-    materialMap[key] = { id: key, ...value };
+    const materialId = isAdditional ? `${prefixBase}${key}` : key;
+    materialSource[materialId] = { id: materialId, ...value };
   });
 
   const descriptors = blueprint.bodies.map((body) => {
-    const translation = [...body.translation];
+    const translation = [
+      (body.translation?.[0] ?? 0) + (spawnOffset.x ?? 0),
+      (body.translation?.[1] ?? 0) + (spawnOffset.y ?? 0),
+      (body.translation?.[2] ?? 0) + (spawnOffset.z ?? 0)
+    ];
     const rotation = [...body.rotation];
     return {
-      id: body.id,
-      materialId: body.materialId,
+      id: isAdditional ? `${prefixBase}${body.id}` : body.id,
+      materialId: isAdditional ? `${prefixBase}${body.materialId}` : body.materialId,
       halfExtents: [...body.halfExtents],
       translation,
       rotation,
@@ -446,12 +531,11 @@ function instantiateCreature(morphGenome, controllerGenome) {
     bodyOrder.push(descriptor.id);
   });
 
-  creatureJoints = [];
-  creatureJointDescriptors = [];
-  creatureJointMap.clear();
   blueprint.joints.forEach((jointDef) => {
-    const parentEntry = creatureBodies.get(jointDef.parentId);
-    const childEntry = creatureBodies.get(jointDef.childId);
+    const parentId = isAdditional ? `${prefixBase}${jointDef.parentId}` : jointDef.parentId;
+    const childId = isAdditional ? `${prefixBase}${jointDef.childId}` : jointDef.childId;
+    const parentEntry = creatureBodies.get(parentId);
+    const childEntry = creatureBodies.get(childId);
     if (!parentEntry || !childEntry) {
       return;
     }
@@ -483,12 +567,7 @@ function instantiateCreature(morphGenome, controllerGenome) {
       };
       jointData = RAPIER.JointData.revolute(parentAnchor, childAnchor, axis);
     }
-    const jointHandle = world.createImpulseJoint(
-      jointData,
-      parentEntry.body,
-      childEntry.body,
-      true
-    );
+    const jointHandle = world.createImpulseJoint(jointData, parentEntry.body, childEntry.body, true);
     if (typeof jointHandle?.setContactsEnabled === 'function') {
       jointHandle.setContactsEnabled(false);
     }
@@ -501,9 +580,9 @@ function instantiateCreature(morphGenome, controllerGenome) {
     }
     creatureJoints.push(jointHandle);
     const descriptor = {
-      id: jointDef.id,
-      parentId: jointDef.parentId,
-      childId: jointDef.childId,
+      id: isAdditional ? `${prefixBase}${jointDef.id}` : jointDef.id,
+      parentId,
+      childId,
       axis: [...jointDef.axis],
       limits: jointDef.limits ? [...jointDef.limits] : null,
       handle: jointHandle
@@ -512,7 +591,7 @@ function instantiateCreature(morphGenome, controllerGenome) {
     creatureJointMap.set(descriptor.id, descriptor);
   });
 
-  bodyDescriptorsCache = descriptors.map((descriptor) => ({
+  const descriptorCopies = descriptors.map((descriptor) => ({
     id: descriptor.id,
     materialId: descriptor.materialId,
     halfExtents: [...descriptor.halfExtents],
@@ -521,7 +600,12 @@ function instantiateCreature(morphGenome, controllerGenome) {
     material: { ...descriptor.material }
   }));
 
-  configureSharedState(bodyDescriptorsCache, materialMap);
+  bodyDescriptorsCache = clearExisting
+    ? descriptorCopies
+    : bodyDescriptorsCache.concat(descriptorCopies);
+  sharedMaterialMap = { ...materialSource };
+
+  configureSharedState(bodyDescriptorsCache, sharedMaterialMap);
   syncSharedState();
 
   const controllerSource = controllerGenome ?? createDefaultControllerGenome();
@@ -532,14 +616,31 @@ function instantiateCreature(morphGenome, controllerGenome) {
       message: `Failed to build controller: ${controllerBlueprint.errors.join('; ')}`
     });
   } else {
-    controllerRuntime = createControllerRuntime(controllerBlueprint);
-    if (!controllerRuntime) {
+    const instanceBlueprint = cloneControllerBlueprintForInstance(
+      controllerBlueprint,
+      isAdditional ? prefixBase : ''
+    );
+    if (!instanceBlueprint) {
       postMessage({
         type: 'error',
-        message: 'Controller runtime failed to initialize.'
+        message: 'Controller blueprint could not be prepared.'
       });
+    } else {
+      const runtime = createControllerRuntime(instanceBlueprint);
+      if (!runtime) {
+        postMessage({
+          type: 'error',
+          message: 'Controller runtime failed to initialize.'
+        });
+      } else {
+        controllerInstances.set(instanceKey, { runtime, prefix: isAdditional ? prefixBase : '' });
+      }
     }
   }
+  if (isAdditional) {
+    additionalInstanceCount += 1;
+  }
+
   return true;
 }
 
@@ -790,8 +891,8 @@ function stepSimulation() {
 
   const dt = world.timestep ?? 1 / 60;
   const sensors = gatherSensorSnapshot();
-  let controllerResult = null;
-  let commands = [];
+  const commands = [];
+  let controllerTelemetry = null;
   if (isReplayActive()) {
     const frame = activeReplay.next();
     if (!frame) {
@@ -800,14 +901,68 @@ function stepSimulation() {
       postMessage({ type: 'replay-complete' });
       return;
     }
-    commands = frame.commands.map((command) => ({
-      id: command.actuatorId ?? undefined,
-      target: { type: 'joint', id: command.targetId },
-      value: command.value
-    }));
-  } else if (controllerRuntime) {
-    controllerResult = controllerRuntime.update(dt, sensors);
-    commands = Array.isArray(controllerResult?.commands) ? controllerResult.commands : [];
+    frame.commands.forEach((command) => {
+      if (!command || typeof command.targetId !== 'string') {
+        return;
+      }
+      commands.push({
+        id: typeof command.actuatorId === 'string' ? command.actuatorId : null,
+        target: { type: 'joint', id: command.targetId },
+        value: command.value
+      });
+    });
+  } else if (controllerInstances.size > 0) {
+    const runtimeResults = [];
+    controllerInstances.forEach((instance, key) => {
+      const runtime = instance?.runtime;
+      if (!runtime || typeof runtime.update !== 'function') {
+        return;
+      }
+      const result = runtime.update(dt, sensors);
+      if (!result) {
+        return;
+      }
+      runtimeResults.push({ key, prefix: instance.prefix ?? '', result });
+      const resultCommands = Array.isArray(result.commands) ? result.commands : [];
+      resultCommands.forEach((command) => {
+        if (!command || command.target?.type !== 'joint' || typeof command.target.id !== 'string') {
+          return;
+        }
+        const actuatorId = typeof command.id === 'string' ? command.id : null;
+        const decoratedId = instance.prefix && actuatorId ? `${key}:${actuatorId}` : actuatorId;
+        commands.push({
+          id: decoratedId,
+          target: { type: 'joint', id: command.target.id },
+          value: command.value
+        });
+      });
+    });
+    if (runtimeResults.length === 1) {
+      const only = runtimeResults[0].result;
+      if (Array.isArray(only?.nodeOutputs)) {
+        controllerTelemetry = only.nodeOutputs;
+      }
+    } else if (runtimeResults.length > 1) {
+      const combined = [];
+      runtimeResults.forEach(({ key, prefix, result }) => {
+        if (!Array.isArray(result?.nodeOutputs)) {
+          return;
+        }
+        result.nodeOutputs.forEach((node) => {
+          if (!node || typeof node !== 'object') {
+            return;
+          }
+          const entry = { ...node, instance: key };
+          if (prefix && typeof node.id === 'string') {
+            entry.id = `${key}:${node.id}`;
+          }
+          combined.push(entry);
+        });
+      });
+      if (combined.length > 0) {
+        controllerTelemetry = combined;
+      }
+    }
   }
 
   if (commands.length > 0) {
@@ -836,8 +991,8 @@ function stepSimulation() {
     payload.bodies = collectBodyStates();
   }
 
-  if (controllerResult?.nodeOutputs) {
-    payload.controller = controllerResult.nodeOutputs;
+  if (controllerTelemetry) {
+    payload.controller = controllerTelemetry;
   }
 
   if (commands.length > 0) {
@@ -902,6 +1057,27 @@ self.addEventListener('message', (event) => {
     setRunning(false);
     const spawned = instantiateCreature(individual?.morph, individual?.controller);
     if (spawned) {
+      setRunning(true);
+    }
+  } else if (data.type === 'add-individual') {
+    const individual =
+      data.individual && typeof data.individual === 'object' ? data.individual : null;
+    if (!individual) {
+      postMessage({ type: 'error', message: 'Invalid individual payload for add.' });
+      return;
+    }
+    const wasRunning = running;
+    if (wasRunning) {
+      setRunning(false);
+    }
+    const spawned = instantiateCreature(individual?.morph, individual?.controller, {
+      clearExisting: false,
+      prefixIds: true
+    });
+    if (!spawned) {
+      postMessage({ type: 'error', message: 'Failed to add the requested individual.' });
+    }
+    if (wasRunning) {
       setRunning(true);
     }
   } else if (data.type === 'play-replay') {
