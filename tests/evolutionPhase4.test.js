@@ -148,7 +148,8 @@ describe('computeLocomotionFitness', () => {
   it('adds an objective reward when moving closer to the target cube', () => {
     const startX = 0;
     const closerX = OBJECTIVE_POSITION.x + 1.5;
-    const fartherX = OBJECTIVE_POSITION.x + 14.5;
+    const travelDistance = Math.abs(startX - closerX);
+    const fartherX = startX + travelDistance;
 
     const towardObjective = [
       { timestamp: 0, centerOfMass: { x: startX, y: 0.8, z: 0 }, rootHeight: 0.8 },
