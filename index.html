@@ -162,6 +162,49 @@
                 <dd id="stat-mean">—</dd>
               </div>
             </dl>
+            <fieldset id="model-library" class="model-library" data-model-library>
+              <legend>Saved Models</legend>
+              <label for="model-name">Model name</label>
+              <div class="model-library__save">
+                <input
+                  id="model-name"
+                  name="modelName"
+                  type="text"
+                  placeholder="e.g., Lecture demo"
+                  maxlength="120"
+                  data-model-name
+                />
+                <button id="model-save" type="button" data-model-save disabled>Save Model</button>
+              </div>
+              <p class="model-library__hint">
+                Store the current best individual with a custom label for later preview.
+              </p>
+              <div class="model-library__list">
+                <label class="model-library__label" for="model-list">Saved entries</label>
+                <select
+                  id="model-list"
+                  class="model-library__select"
+                  size="4"
+                  data-model-list
+                  aria-label="Saved models"
+                ></select>
+                <p id="model-empty" class="model-library__empty" role="status" data-model-empty>
+                  No saved models yet.
+                </p>
+              </div>
+              <div class="model-library__actions">
+                <button id="model-load" type="button" data-model-load disabled>Load</button>
+                <button
+                  id="model-delete"
+                  type="button"
+                  class="model-library__delete"
+                  data-model-delete
+                  disabled
+                >
+                  Delete
+                </button>
+              </div>
+            </fieldset>
           </div>
         </form>
         <section

@@ -258,6 +258,77 @@ h2 {
   font-weight: 600;
 }
 
+.model-library {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  padding: 0.75rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.model-library__save {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.model-library__save input {
+  flex: 1;
+}
+
+.model-library__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: rgba(226, 232, 240, 0.6);
+}
+
+.model-library__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.model-library__label {
+  font-size: 0.75rem;
+  color: rgba(226, 232, 240, 0.55);
+}
+
+.model-library__select {
+  min-height: 6.5rem;
+  padding: 0.4rem;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.7);
+  color: inherit;
+  font: inherit;
+}
+
+.model-library__select.is-hidden {
+  display: none;
+}
+
+.model-library__empty {
+  margin: 0;
+  font-size: 0.8rem;
+  color: rgba(226, 232, 240, 0.6);
+}
+
+.model-library__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.model-library__actions button {
+  flex: 1;
+}
+
+.model-library__delete {
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  color: #fca5a5;
+}
+
 .generation-viewer {
   display: flex;
   flex-direction: column;
