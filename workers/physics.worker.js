@@ -21,6 +21,8 @@ import {
   horizontalDistanceToObjective
 } from '../public/environment/arena.js';
 import { MAX_JOINT_ANGULAR_DELTA } from '../public/physics/constants.js';
+import { enableContinuousCollisionDetection } from '../public/physics/ccd.js';
+import { configureCreatureSimulationWorld } from '../public/physics/stability.js';
 import { DEFAULT_STAGE_ID, getStageDefinition } from '../public/environment/stages.js';
 
 function createInteractionGroup(membership, filter) {
@@ -509,6 +511,8 @@ function instantiateCreature(morphGenome, controllerGenome, options = {}) {
       .setLinearDamping(descriptor.linearDamping ?? 0.05)
       .setAngularDamping(descriptor.angularDamping ?? 0.08);
 
+    enableContinuousCollisionDetection(bodyDesc);
+
     const rigidBody = world.createRigidBody(bodyDesc);
     const colliderDesc = RAPIER.ColliderDesc.cuboid(
       descriptor.halfExtents[0],
@@ -519,6 +523,8 @@ function instantiateCreature(morphGenome, controllerGenome, options = {}) {
       .setFriction(descriptor.material?.friction ?? 0.9)
       .setRestitution(descriptor.material?.restitution ?? 0.2)
       .setCollisionGroups(COLLISION_GROUP_CREATURE);
+
+    enableContinuousCollisionDetection(colliderDesc);
     const collider = world.createCollider(colliderDesc, rigidBody);
 
     creatureBodies.set(descriptor.id, {
@@ -812,6 +818,7 @@ async function initializeWorld() {
     const gravity = new RAPIER.Vector3(0, -9.81, 0);
     world = new RAPIER.World(gravity);
     world.timestep = 1 / 60;
+    configureCreatureSimulationWorld(world);
 
     const floorCollider = RAPIER.ColliderDesc.cuboid(
       ARENA_HALF_EXTENTS.x,

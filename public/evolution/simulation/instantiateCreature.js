@@ -8,6 +8,7 @@ import {
 } from '../../../genomes/ctrlGenome.js';
 import { createControllerRuntime } from '../../../workers/controllerRuntime.js';
 import { COLLISION_GROUP_CREATURE } from './common.js';
+import { enableContinuousCollisionDetection } from '../../physics/ccd.js';
 
 export function instantiateCreature(RAPIER, world, morphGenome, controllerGenome) {
   const morph = morphGenome ?? createDefaultMorphGenome();
@@ -22,25 +23,28 @@ export function instantiateCreature(RAPIER, world, morphGenome, controllerGenome
   morphBlueprint.bodies.forEach((body) => {
     const translation = body.translation;
     const rotation = body.rotation;
-    const rigidBody = world.createRigidBody(
-      RAPIER.RigidBodyDesc.dynamic()
-        .setTranslation(translation[0], translation[1], translation[2])
-        .setRotation({ x: rotation[0], y: rotation[1], z: rotation[2], w: rotation[3] })
-        .setLinearDamping(body.linearDamping ?? 0.05)
-        .setAngularDamping(body.angularDamping ?? 0.08)
-    );
-    const collider = world.createCollider(
-      RAPIER.ColliderDesc.cuboid(
-        body.halfExtents[0],
-        body.halfExtents[1],
-        body.halfExtents[2]
-      )
-        .setDensity(body.density ?? 1)
-        .setFriction(body.material?.friction ?? 0.9)
-        .setRestitution(body.material?.restitution ?? 0.2)
-        .setCollisionGroups(COLLISION_GROUP_CREATURE),
-      rigidBody
-    );
+    const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
+      .setTranslation(translation[0], translation[1], translation[2])
+      .setRotation({ x: rotation[0], y: rotation[1], z: rotation[2], w: rotation[3] })
+      .setLinearDamping(body.linearDamping ?? 0.05)
+      .setAngularDamping(body.angularDamping ?? 0.08);
+
+    enableContinuousCollisionDetection(bodyDesc);
+
+    const rigidBody = world.createRigidBody(bodyDesc);
+    const colliderDesc = RAPIER.ColliderDesc.cuboid(
+      body.halfExtents[0],
+      body.halfExtents[1],
+      body.halfExtents[2]
+    )
+      .setDensity(body.density ?? 1)
+      .setFriction(body.material?.friction ?? 0.9)
+      .setRestitution(body.material?.restitution ?? 0.2)
+      .setCollisionGroups(COLLISION_GROUP_CREATURE);
+
+    enableContinuousCollisionDetection(colliderDesc);
+
+    const collider = world.createCollider(colliderDesc, rigidBody);
 
     bodies.set(body.id, {
       body: rigidBody,
