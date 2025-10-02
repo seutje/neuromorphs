@@ -272,6 +272,24 @@ h2 {
   gap: 0.75rem;
 }
 
+.run-controls__starting {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1 1 100%;
+}
+
+.run-controls__starting label {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: rgba(226, 232, 240, 0.8);
+  text-transform: uppercase;
+}
+
+.run-controls__starting select {
+  width: 100%;
+}
+
 .run-controls__weights {
   display: flex;
   flex-direction: column;

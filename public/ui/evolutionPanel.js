@@ -124,8 +124,10 @@ export function createEvolutionPanel({
   });
 
   function getConfig() {
+    const startingModelValue = form.startingModelId?.value ?? '';
     return {
       seed: parseInteger(form.seed?.value, 42),
+      startingModelId: startingModelValue === '' ? null : startingModelValue,
       populationSize: Math.max(4, parseInteger(form.populationSize?.value, 12)),
       generations: Math.max(1, parseInteger(form.generations?.value, 10)),
       selectionWeights: resolveSelectionWeights({

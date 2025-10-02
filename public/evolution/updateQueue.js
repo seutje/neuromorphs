@@ -64,7 +64,11 @@ export function createUpdateQueue({
   }
 
   function flushNow(options = {}) {
-    drain({ force: Boolean(options.force) });
+    const forced = Boolean(options.force);
+    drain({ force: forced });
+    if (forced) {
+      lastFlushTime = Number.NEGATIVE_INFINITY;
+    }
   }
 
   function cancel() {

@@ -36,6 +36,7 @@ const resetAllButton = document.querySelector('#reset-all');
 const evolutionForm = document.querySelector('#evolution-config');
 const evolutionStartButton = document.querySelector('#evolution-start');
 const previewBestButton = document.querySelector('#preview-best');
+const startingModelSelect = document.querySelector('#starting-model');
 const evolutionProgress = document.querySelector('#evolution-progress');
 const statGeneration = document.querySelector('#stat-generation');
 const statBest = document.querySelector('#stat-best');
@@ -96,6 +97,7 @@ let activeRunTotalGenerations = 0;
 let generationViewer = null;
 let modelLibrary = null;
 let savedModelRecords = listModelRecords();
+refreshStartingModelSelect();
 let pendingDefaultModelRecord = resolveDefaultModelRecord(savedModelRecords);
 let defaultModelRecordId = pendingDefaultModelRecord?.id ?? null;
 let defaultModelSpawnedForStage = false;
@@ -138,6 +140,74 @@ function setLatestBestIndividual(individual) {
   updatePreviewButtonState();
 }
 
+function refreshStartingModelSelect(selectedId = undefined) {
+  if (!startingModelSelect) {
+    return;
+  }
+  const doc = startingModelSelect.ownerDocument ?? document;
+  const previousValue =
+    selectedId !== undefined ? selectedId ?? '' : startingModelSelect.value ?? '';
+  startingModelSelect.innerHTML = '';
+
+  const defaultOption = doc.createElement('option');
+  defaultOption.value = '';
+  defaultOption.textContent = 'Hopper (default)';
+  startingModelSelect.append(defaultOption);
+
+  savedModelRecords.forEach((record) => {
+    if (!record || !record.id) {
+      return;
+    }
+    const option = doc.createElement('option');
+    option.value = record.id;
+    option.textContent = typeof record.name === 'string' && record.name.trim()
+      ? record.name.trim()
+      : 'Saved model';
+    startingModelSelect.append(option);
+  });
+
+  if (
+    previousValue &&
+    savedModelRecords.some((record) => record && record.id === previousValue)
+  ) {
+    startingModelSelect.value = previousValue;
+  } else {
+    startingModelSelect.value = '';
+  }
+}
+
+function resolveStartingModel(modelId) {
+  if (!modelId) {
+    return {
+      id: null,
+      morph: null,
+      controller: null
+    };
+  }
+  const memoryRecord = savedModelRecords.find((entry) => entry && entry.id === modelId);
+  const record = memoryRecord ?? loadModelRecord(modelId);
+  if (!record || !record.individual) {
+    return {
+      id: null,
+      morph: null,
+      controller: null
+    };
+  }
+  const individual = record.individual;
+  if (!individual.morph || !individual.controller) {
+    return {
+      id: null,
+      morph: null,
+      controller: null
+    };
+  }
+  return {
+    id: record.id ?? modelId,
+    morph: deepClone(individual.morph),
+    controller: deepClone(individual.controller)
+  };
+}
+
 updatePreviewButtonState();
 
 function refreshModelLibrary(selectedId = null) {
@@ -148,6 +218,7 @@ function refreshModelLibrary(selectedId = null) {
   if (selectedId) {
     modelLibrary.setSelectedId(selectedId);
   }
+  refreshStartingModelSelect();
 }
 
 function addModelRecordToStage(record, { announce = false } = {}) {
@@ -246,6 +317,7 @@ async function seedDefaultModelIfNeeded() {
     const stored = saveModelRecord(record);
     if (stored) {
       savedModelRecords = listModelRecords();
+      refreshStartingModelSelect();
       pendingDefaultModelRecord = deepClone(stored);
       defaultModelRecordId = stored.id ?? null;
       return stored;
@@ -258,6 +330,7 @@ async function seedDefaultModelIfNeeded() {
     };
     defaultModelRecordId = pendingDefaultModelRecord.id;
     savedModelRecords = listModelRecords();
+    refreshStartingModelSelect();
     return pendingDefaultModelRecord;
   } catch (error) {
     console.warn('Failed to load default model for the stage:', error);
@@ -312,11 +385,13 @@ function applyConfigToForm(config) {
   if (!config || !evolutionForm) {
     return;
   }
+  refreshStartingModelSelect(config.startingModelId ?? undefined);
   const assign = (name, value) => {
     if (evolutionForm[name]) {
       evolutionForm[name].value = String(value ?? '');
     }
   };
+  assign('startingModelId', config.startingModelId ?? '');
   assign('seed', config.seed ?? 42);
   assign('populationSize', config.populationSize ?? 12);
   assign('generations', config.generations ?? 10);
@@ -549,7 +624,13 @@ function applySavedRunStateToUi(state) {
   }
 }
 
-async function executeEvolutionRun({ config, resumeState = null, resetStats = true } = {}) {
+async function executeEvolutionRun({
+  config,
+  resumeState = null,
+  resetStats = true,
+  baseMorph = null,
+  baseController = null
+} = {}) {
   if (!config || evolutionAbortController) {
     return;
   }
@@ -604,6 +685,8 @@ async function executeEvolutionRun({ config, resumeState = null, resetStats = tr
       },
       selectionWeights,
       stageId: config.stageId ?? activeStageId,
+      baseMorph: baseMorph ?? undefined,
+      baseController: baseController ?? undefined,
       resume: resumeState,
       signal: controller.signal,
       onGeneration: (entry) => {
@@ -726,6 +809,7 @@ if (modelLibraryContainer) {
       return;
     }
     savedModelRecords = listModelRecords();
+    refreshStartingModelSelect();
     modelLibrary.setModels(savedModelRecords);
     modelLibrary.setSelectedId(record.id);
     modelLibrary.clearName();
@@ -738,6 +822,7 @@ if (modelLibraryContainer) {
       return;
     }
     savedModelRecords = listModelRecords();
+    refreshStartingModelSelect(id);
     modelLibrary.setModels(savedModelRecords);
     modelLibrary.setSelectedId(id);
     const clone = deepClone(record.individual);
@@ -797,6 +882,7 @@ if (modelLibraryContainer) {
       return;
     }
     savedModelRecords = listModelRecords();
+    refreshStartingModelSelect();
     modelLibrary.setModels(savedModelRecords);
     modelLibrary.setHasModelAvailable(Boolean(latestBestIndividual));
     updateStatus(`Deleted model "${label}".`);
@@ -1061,6 +1147,12 @@ physicsWorker.addEventListener('message', (event) => {
 });
 
 evolutionPanel.onStart((config) => {
+  const startingModel = resolveStartingModel(config.startingModelId);
+  if (config.startingModelId && !startingModel.id) {
+    updateStatus('Selected starting model unavailable. Using Hopper baseline.');
+  }
+  config.startingModelId = startingModel.id;
+  refreshStartingModelSelect(startingModel.id ?? undefined);
   const runConfig = { ...config, stageId: activeStageId };
   const resumeState = resolveAbortedResumeState(runConfig);
   if (resumeState) {
@@ -1075,7 +1167,9 @@ evolutionPanel.onStart((config) => {
   executeEvolutionRun({
     config: runConfig,
     resumeState: resumeState ?? null,
-    resetStats: !resumeState
+    resetStats: !resumeState,
+    baseMorph: startingModel.morph,
+    baseController: startingModel.controller
   });
 });
 
