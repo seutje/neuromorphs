@@ -69,6 +69,29 @@ describe('simulateLocomotion', () => {
     expect(result.trace.length).toBeGreaterThan(0);
     expect(result.runtime).toBeGreaterThan(0);
   });
+
+  it('honors an explicit abort callback during simulation', async () => {
+    const morph = createDefaultMorphGenome();
+    const controller = createDefaultControllerGenome();
+    const abortError = new Error('stop-now');
+    let calls = 0;
+
+    await expect(
+      simulateLocomotion({
+        morphGenome: morph,
+        controllerGenome: controller,
+        duration: 2,
+        sampleInterval: 1 / 60,
+        shouldAbort: () => {
+          calls += 1;
+          if (calls > 5) {
+            throw abortError;
+          }
+        }
+      })
+    ).rejects.toBe(abortError);
+    expect(calls).toBeGreaterThan(5);
+  });
 });
 
 describe('morph genome mutations', () => {

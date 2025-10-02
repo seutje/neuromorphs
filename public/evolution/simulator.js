@@ -23,7 +23,8 @@ export async function simulateLocomotion({
   timestep = 1 / 60,
   sampleInterval = 1 / 30,
   signal,
-  stageId = DEFAULT_STAGE_ID
+  stageId = DEFAULT_STAGE_ID,
+  shouldAbort
 } = {}) {
   const RAPIER = await loadRapier();
   const world = createSimulationWorld(RAPIER, timestep, stageId);
@@ -41,15 +42,23 @@ export async function simulateLocomotion({
     let sensors = gatherSensorSnapshot(instance);
     recordSample(instance, trace, 0, sensors);
 
-    for (let step = 0; step < totalSteps; step += 1) {
+    const checkAbort = () => {
+      if (typeof shouldAbort === 'function') {
+        shouldAbort();
+      }
       if (signal?.aborted) {
         throw signal.reason ?? new Error('Simulation aborted');
       }
+    };
+
+    for (let step = 0; step < totalSteps; step += 1) {
+      checkAbort();
 
       const result = runtime.update(dt, sensors);
       applyControllerCommands(instance, result?.commands ?? []);
 
       world.step();
+      checkAbort();
 
       sensors = gatherSensorSnapshot(instance);
       const timestamp = (step + 1) * dt;
