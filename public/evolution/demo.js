@@ -52,7 +52,8 @@ export async function runEvolutionDemo(options = {}) {
     logger = console,
     simulationDuration = 60,
     simulationTimestep = 1 / 60,
-    simulationSampleInterval = 1 / 30
+    simulationSampleInterval = 1 / 30,
+    fitnessWeights = {}
   } = options;
 
   const mutationConfig = {
@@ -135,7 +136,8 @@ export async function runEvolutionDemo(options = {}) {
       duration: simulationDuration,
       timestep: simulationTimestep,
       sampleInterval: simulationSampleInterval
-    }
+    },
+    fitnessWeights
   });
 
   if (typeof onComplete === 'function') {

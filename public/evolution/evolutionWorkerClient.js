@@ -104,7 +104,8 @@ export function runEvolutionInWorker({
   simulation,
   onGeneration,
   onStateSnapshot,
-  signal
+  signal,
+  fitnessWeights
 } = {}) {
   const worker = ensureWorker();
   const runId = `evo-${runCounter++}`;
@@ -148,7 +149,8 @@ export function runEvolutionInWorker({
         rngState,
         startGeneration,
         history,
-        simulation
+        simulation,
+        fitnessWeights
       }
     });
   });

@@ -70,6 +70,22 @@ export function createEvolutionPanel({
         addConnectionChance: clamp01(
           parseFloatValue(form.controllerAddConnectionChance?.value, 0.45)
         )
+      },
+      fitnessWeights: {
+        displacementWeight: Math.max(
+          0,
+          parseFloatValue(form.fitnessDisplacementWeight?.value, 1)
+        ),
+        heightWeight: Math.max(0, parseFloatValue(form.fitnessHeightWeight?.value, 0.1)),
+        velocityWeight: Math.max(
+          0,
+          parseFloatValue(form.fitnessVelocityWeight?.value, 0.5)
+        ),
+        objectiveWeight: Math.max(
+          0,
+          parseFloatValue(form.fitnessObjectiveWeight?.value, 1)
+        ),
+        fallPenalty: Math.max(0, parseFloatValue(form.fitnessFallPenalty?.value, 2))
       }
     };
   }

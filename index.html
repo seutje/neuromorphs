@@ -152,6 +152,56 @@
                   aria-live="polite"
                 ></progress>
               </div>
+              <div class="fitness-weights">
+                <h4 class="fitness-weights__title">Fitness Weights</h4>
+                <div class="fitness-weights__grid">
+                  <label for="config-fitness-displacement">Displacement</label>
+                  <input
+                    id="config-fitness-displacement"
+                    name="fitnessDisplacementWeight"
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value="1"
+                  />
+                  <label for="config-fitness-height">Average Height</label>
+                  <input
+                    id="config-fitness-height"
+                    name="fitnessHeightWeight"
+                    type="number"
+                    min="0"
+                    step="0.05"
+                    value="0.1"
+                  />
+                  <label for="config-fitness-velocity">Average Speed</label>
+                  <input
+                    id="config-fitness-velocity"
+                    name="fitnessVelocityWeight"
+                    type="number"
+                    min="0"
+                    step="0.05"
+                    value="0.5"
+                  />
+                  <label for="config-fitness-objective">Objective Reward</label>
+                  <input
+                    id="config-fitness-objective"
+                    name="fitnessObjectiveWeight"
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value="1"
+                  />
+                  <label for="config-fitness-fall">Fall Penalty</label>
+                  <input
+                    id="config-fitness-fall"
+                    name="fitnessFallPenalty"
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value="2"
+                  />
+                </div>
+              </div>
               <dl id="evolution-stats" class="stats-readout">
                 <div class="stat-row">
                   <dt>Generation</dt>

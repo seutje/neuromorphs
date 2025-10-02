@@ -105,14 +105,33 @@ describe('computeLocomotionFitness', () => {
     expect(fastFitness.fitness).toBeGreaterThan(slowFitness.fitness);
   });
 
+  it('applies configurable metric weights when provided', () => {
+    const trace = [
+      { timestamp: 0, centerOfMass: { x: 0, y: 0.8, z: 0 }, rootHeight: 0.8 },
+      { timestamp: 1, centerOfMass: { x: 1, y: 0.8, z: 0 }, rootHeight: 0.8 }
+    ];
+
+    const defaultMetrics = computeLocomotionFitness(trace);
+    const zeroedMetrics = computeLocomotionFitness(trace, {
+      displacementWeight: 0,
+      heightWeight: 0,
+      velocityWeight: 0,
+      objectiveWeight: 0,
+      fallPenalty: 0
+    });
+
+    expect(defaultMetrics.fitness).toBeGreaterThan(0);
+    expect(zeroedMetrics.fitness).toBe(0);
+  });
+
   it('adds an objective reward when moving closer to the target cube', () => {
     const towardObjective = [
       { timestamp: 0, centerOfMass: { x: 0, y: 0.8, z: 0 }, rootHeight: 0.8 },
-      { timestamp: 1, centerOfMass: { x: 6.5, y: 0.82, z: 0 }, rootHeight: 0.82 }
+      { timestamp: 1, centerOfMass: { x: -6.5, y: 0.82, z: 0 }, rootHeight: 0.82 }
     ];
     const awayFromObjective = [
       { timestamp: 0, centerOfMass: { x: 0, y: 0.8, z: 0 }, rootHeight: 0.8 },
-      { timestamp: 1, centerOfMass: { x: -6.5, y: 0.82, z: 0 }, rootHeight: 0.82 }
+      { timestamp: 1, centerOfMass: { x: 6.5, y: 0.82, z: 0 }, rootHeight: 0.82 }
     ];
 
     const towardFitness = computeLocomotionFitness(towardObjective);

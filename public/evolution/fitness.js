@@ -6,6 +6,7 @@ import {
 const DEFAULT_OPTIONS = {
   fallHeight: 0.25,
   fallPenalty: 2,
+  displacementWeight: 1,
   heightWeight: 0.1,
   velocityWeight: 0.5,
   uprightPercentile: 0.6,
@@ -138,9 +139,10 @@ export function analyzeLocomotionTrace(samples, options = {}) {
 export function computeLocomotionFitness(samples, options = {}) {
   const stats = analyzeLocomotionTrace(samples, options);
   const config = { ...DEFAULT_OPTIONS, ...options };
+  const displacementScore = stats.displacement * config.displacementWeight;
   const heightBonus = stats.averageHeight * config.heightWeight;
   const speedBonus = stats.averageSpeed * config.velocityWeight;
-  const fallPenalty = config.fallPenalty * stats.fallFraction;
+  const fallPenaltyScore = config.fallPenalty * stats.fallFraction;
   const objectiveImprovement = Math.max(
     stats.objectiveStartDistance - stats.objectiveBestDistance,
     0
@@ -150,7 +152,7 @@ export function computeLocomotionFitness(samples, options = {}) {
     ...stats,
     objectiveReward,
     fitness: Math.max(
-      stats.displacement + heightBonus + speedBonus + objectiveReward - fallPenalty,
+      displacementScore + heightBonus + speedBonus + objectiveReward - fallPenaltyScore,
       0
     )
   };

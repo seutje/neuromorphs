@@ -64,7 +64,8 @@ self.addEventListener('message', async (event) => {
     rngState,
     startGeneration,
     history,
-    simulation
+    simulation,
+    fitnessWeights
   } = payload;
 
   const controller = new AbortController();
@@ -107,7 +108,7 @@ self.addEventListener('message', async (event) => {
           sampleInterval: simulation?.sampleInterval,
           signal: controller.signal
         });
-        const metrics = computeLocomotionFitness(simulationResult.trace);
+        const metrics = computeLocomotionFitness(simulationResult.trace, fitnessWeights);
         return {
           fitness: metrics.fitness,
           metrics,
