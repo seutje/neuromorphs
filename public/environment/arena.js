@@ -9,7 +9,7 @@ export const ARENA_SIZE = {
 export const OBJECTIVE_HALF_EXTENTS = { x: 0.4, y: 0.4, z: 0.4 };
 export const OBJECTIVE_COLOR = '#22c55e';
 export const OBJECTIVE_POSITION = {
-  x: 8,
+  x: -8,
   y: ARENA_FLOOR_Y + ARENA_HALF_EXTENTS.y + OBJECTIVE_HALF_EXTENTS.y,
   z: 0
 };
