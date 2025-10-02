@@ -61,6 +61,9 @@ const modelLibraryContainer = document.querySelector('#model-library');
 const DEFAULT_MODEL_URL = new URL('../models/catdog.json', import.meta.url);
 const DEFAULT_MODEL_ID = '9ca351f8-e466-414f-89e4-de08bd771d9b';
 const DEFAULT_MODEL_NAME = 'catdog';
+const HOOMAN_MODEL_URL = new URL('../models/hooman.json', import.meta.url);
+const HOOMAN_MODEL_ID = 'd9c1b1a1-869d-4f6a-a3e1-30d8f02c587b';
+const HOOMAN_MODEL_NAME = 'hooman';
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -115,6 +118,7 @@ let viewControls = null;
 let evolutionPanel = null;
 
 const defaultModelPromise = seedDefaultModelIfNeeded();
+const prefabSeedPromise = seedAdditionalPrefabs();
 defaultModelPromise.then((record) => {
   if (!record) {
     return;
@@ -125,6 +129,24 @@ defaultModelPromise.then((record) => {
     tryAddPendingDefaultModelToStage();
   }
 });
+
+prefabSeedPromise
+  .then((changed) => {
+    if (!changed) {
+      return;
+    }
+    savedModelRecords = listModelRecords();
+    refreshStartingModelSelect(defaultModelRecordId);
+    if (modelLibrary) {
+      modelLibrary.setModels(savedModelRecords);
+      if (defaultModelRecordId) {
+        modelLibrary.setSelectedId(defaultModelRecordId);
+      }
+    }
+  })
+  .catch((error) => {
+    console.warn('Failed to seed prefab models:', error);
+  });
 
 function updatePreviewButtonState() {
   if (previewBestButton) {
@@ -335,6 +357,81 @@ async function seedDefaultModelIfNeeded() {
   } catch (error) {
     console.warn('Failed to load default model for the stage:', error);
     return null;
+  }
+}
+
+async function seedAdditionalPrefabs() {
+  const references = [
+    {
+      id: HOOMAN_MODEL_ID,
+      name: HOOMAN_MODEL_NAME,
+      url: HOOMAN_MODEL_URL
+    }
+  ];
+  let changed = false;
+  for (const reference of references) {
+    // Fetch and store each prefab if it's not already persisted.
+    if (await seedPrefabModelIfMissing(reference)) {
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+async function seedPrefabModelIfMissing(reference) {
+  if (!reference || !reference.url) {
+    return false;
+  }
+  const lowerName =
+    typeof reference.name === 'string' && reference.name.trim()
+      ? reference.name.trim().toLowerCase()
+      : '';
+  const existing = listModelRecords();
+  const matched = existing.some((record) => {
+    if (!record) {
+      return false;
+    }
+    if (reference.id && record.id === reference.id) {
+      return true;
+    }
+    if (lowerName && typeof record.name === 'string') {
+      return record.name.trim().toLowerCase() === lowerName;
+    }
+    return false;
+  });
+  if (matched) {
+    return false;
+  }
+  try {
+    const response = await fetch(reference.url);
+    if (!response.ok) {
+      console.warn(
+        `Failed to load prefab model ${reference.name ?? reference.id ?? reference.url} (status ${response.status}).`
+      );
+      return false;
+    }
+    const payload = await response.json();
+    if (!payload || typeof payload !== 'object' || !payload.individual) {
+      console.warn('Prefab model payload missing individual data.');
+      return false;
+    }
+    const recordName =
+      typeof reference.name === 'string' && reference.name.trim()
+        ? reference.name.trim()
+        : typeof payload.name === 'string' && payload.name.trim()
+          ? payload.name.trim()
+          : 'Prefab Model';
+    const stored = saveModelRecord({
+      id:
+        typeof reference.id === 'string' && reference.id.trim() ? reference.id.trim() : payload.id ?? undefined,
+      name: recordName,
+      individual: payload.individual,
+      config: payload.config ?? null
+    });
+    return Boolean(stored);
+  } catch (error) {
+    console.warn('Failed to seed prefab model:', error);
+    return false;
   }
 }
 
