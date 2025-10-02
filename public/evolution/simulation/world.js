@@ -4,9 +4,10 @@ import {
   OBJECTIVE_HALF_EXTENTS,
   OBJECTIVE_POSITION
 } from '../../environment/arena.js';
+import { DEFAULT_STAGE_ID, getStageDefinition } from '../../environment/stages.js';
 import { COLLISION_GROUP_ENVIRONMENT } from './common.js';
 
-export function createSimulationWorld(RAPIER, timestep) {
+export function createSimulationWorld(RAPIER, timestep, stageId = DEFAULT_STAGE_ID) {
   const gravity = new RAPIER.Vector3(0, -9.81, 0);
   const world = new RAPIER.World(gravity);
   world.timestep = timestep;
@@ -28,6 +29,29 @@ export function createSimulationWorld(RAPIER, timestep) {
     .setTranslation(OBJECTIVE_POSITION.x, OBJECTIVE_POSITION.y, OBJECTIVE_POSITION.z)
     .setCollisionGroups(COLLISION_GROUP_ENVIRONMENT);
   world.createCollider(objective);
+
+  const stage = getStageDefinition(stageId);
+  if (stage && Array.isArray(stage.obstacles)) {
+    stage.obstacles.forEach((obstacle) => {
+      if (!obstacle || obstacle.type !== 'box') {
+        return;
+      }
+      const halfExtents = obstacle.halfExtents ?? { x: 0.5, y: 0.5, z: 0.5 };
+      const translation = obstacle.translation ?? { x: 0, y: 0, z: 0 };
+      const collider = RAPIER.ColliderDesc.cuboid(
+        halfExtents.x ?? 0.5,
+        halfExtents.y ?? 0.5,
+        halfExtents.z ?? 0.5
+      )
+        .setTranslation(
+          translation.x ?? 0,
+          translation.y ?? 0,
+          translation.z ?? 0
+        )
+        .setCollisionGroups(COLLISION_GROUP_ENVIRONMENT);
+      world.createCollider(collider);
+    });
+  }
 
   return world;
 }

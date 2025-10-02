@@ -8,6 +8,7 @@ import {
   objectiveToSelectionWeights,
   resolveSelectionWeights
 } from './evolution/fitness.js';
+import { DEFAULT_STAGE_ID, getStageDefinition, listStages } from './environment/stages.js';
 import {
   saveRunState,
   loadRunState,
@@ -26,6 +27,8 @@ const canvas = document.querySelector('#viewport');
 const statusMessage = document.querySelector('#status-message');
 const viewModeSelect = document.querySelector('#view-mode');
 const simulationToggleButton = document.querySelector('#simulation-toggle');
+const stageSelect = document.querySelector('#stage-select');
+const loadStageButton = document.querySelector('#load-stage');
 const evolutionForm = document.querySelector('#evolution-config');
 const evolutionStartButton = document.querySelector('#evolution-start');
 const previewBestButton = document.querySelector('#preview-best');
@@ -66,12 +69,18 @@ let activeRunTotalGenerations = 0;
 let generationViewer = null;
 let modelLibrary = null;
 let savedModelRecords = listModelRecords();
+let activeStageId = DEFAULT_STAGE_ID;
+let queuedStageId = DEFAULT_STAGE_ID;
 let workerReady = false;
 let physicsRunning = false;
 let sharedStateEnabled = false;
 let lastHeightLog = 0;
 let sensorLogTimestamp = 0;
 let evolutionAbortController = null;
+let physicsWorker = null;
+let viewer = null;
+let viewControls = null;
+let evolutionPanel = null;
 
 function updatePreviewButtonState() {
   if (previewBestButton) {
@@ -88,6 +97,40 @@ function setLatestBestIndividual(individual) {
 }
 
 updatePreviewButtonState();
+
+function loadStage(stageId, { announce = true } = {}) {
+  const stage = getStageDefinition(stageId ?? activeStageId ?? DEFAULT_STAGE_ID);
+  if (!stage) {
+    return;
+  }
+  activeStageId = stage.id;
+  queuedStageId = stage.id;
+  if (viewControls) {
+    viewControls.setStage(stage.id);
+  }
+  if (viewer) {
+    viewer.setStage(stage.id);
+  }
+  if (announce) {
+    updateStatus(`Loading ${stage.label} stage…`);
+  }
+  if (physicsWorker && workerReady) {
+    physicsWorker.postMessage({ type: 'load-stage', stageId: stage.id });
+  }
+}
+
+function applyStageFromConfig(config, { announce = false } = {}) {
+  if (!config) {
+    return;
+  }
+  const stageId = config.stageId ?? DEFAULT_STAGE_ID;
+  if (stageId !== activeStageId || viewer?.getStageId?.() !== stageId) {
+    loadStage(stageId, { announce });
+  } else if (viewControls) {
+    viewControls.setStage(stageId);
+    queuedStageId = stageId;
+  }
+}
 
 function applyConfigToForm(config) {
   if (!config || !evolutionForm) {
@@ -252,6 +295,7 @@ function applySavedRunStateToUi(state) {
   }
   if (state.config) {
     applyConfigToForm(state.config);
+    applyStageFromConfig(state.config, { announce: false });
   }
   const total = state.totalGenerations ?? state.config?.generations ?? 0;
   const generation = state.generation ?? 0;
@@ -284,6 +328,7 @@ async function executeEvolutionRun({ config, resumeState = null, resetStats = tr
   }
   activeRunConfig = deepClone(config);
   activeRunTotalGenerations = config.generations;
+  applyStageFromConfig(config, { announce: false });
   const selectionWeights = resolveSelectionWeights(
     config.selectionWeights ??
       (config.selectionObjective
@@ -321,6 +366,7 @@ async function executeEvolutionRun({ config, resumeState = null, resetStats = tr
         controller: config.controllerMutation
       },
       selectionWeights,
+      stageId: config.stageId ?? activeStageId,
       resume: resumeState,
       signal: controller.signal,
       onGeneration: (entry) => {
@@ -363,9 +409,26 @@ if (!canvas) {
   throw new Error('Viewport canvas not found.');
 }
 
-const viewer = createViewer(canvas);
-const viewControls = createViewControls({ select: viewModeSelect, button: simulationToggleButton });
-const evolutionPanel = createEvolutionPanel({
+viewer = createViewer(canvas);
+viewControls = createViewControls({
+  select: viewModeSelect,
+  button: simulationToggleButton,
+  stageSelect,
+  stageButton: loadStageButton
+});
+const availableStages = listStages();
+viewControls.setStages(availableStages);
+viewControls.setStage(activeStageId);
+if (viewer) {
+  viewer.setStage(activeStageId);
+}
+const defaultStage = getStageDefinition(activeStageId);
+queuedStageId = defaultStage.id;
+viewControls.onStageLoad((stageId) => {
+  loadStage(stageId);
+});
+loadStage(activeStageId, { announce: false });
+evolutionPanel = createEvolutionPanel({
   form: evolutionForm,
   button: evolutionStartButton,
   progress: evolutionProgress,
@@ -404,6 +467,9 @@ if (modelLibraryContainer) {
     const sourceConfig = persistedRunState?.config
       ? deepClone(persistedRunState.config)
       : deepClone(evolutionPanel.getConfig());
+    if (sourceConfig) {
+      sourceConfig.stageId = activeStageId;
+    }
     const record = saveModelRecord({
       name,
       individual: latestBestIndividual,
@@ -428,6 +494,7 @@ if (modelLibraryContainer) {
     setLatestBestIndividual(record.individual);
     if (record.config) {
       applyConfigToForm(record.config);
+      applyStageFromConfig(record.config, { announce: false });
     }
     savedModelRecords = listModelRecords();
     modelLibrary.setModels(savedModelRecords);
@@ -516,7 +583,7 @@ if (simulationToggleButton) {
   simulationToggleButton.disabled = true;
 }
 
-const physicsWorker = new Worker(new URL('../workers/physics.worker.js', import.meta.url), {
+physicsWorker = new Worker(new URL('../workers/physics.worker.js', import.meta.url), {
   type: 'module'
 });
 
@@ -574,7 +641,9 @@ function copyTextToClipboard(text) {
 
 function setPhysicsRunning(next) {
   physicsRunning = Boolean(next);
-  viewControls.setSimulationRunning(physicsRunning);
+  if (viewControls) {
+    viewControls.setSimulationRunning(physicsRunning);
+  }
 }
 
 function previewIndividual(individual, { message } = {}) {
@@ -582,7 +651,7 @@ function previewIndividual(individual, { message } = {}) {
     updateStatus('No evolved individual available for preview yet.');
     return;
   }
-  if (!workerReady) {
+  if (!physicsWorker || !workerReady) {
     updateStatus('Physics worker is still initializing. Please try again once ready.');
     return;
   }
@@ -601,7 +670,7 @@ function previewIndividual(individual, { message } = {}) {
 }
 
 viewControls.onSimulationToggle(() => {
-  if (!workerReady) {
+  if (!physicsWorker || !workerReady) {
     return;
   }
   physicsWorker.postMessage({ type: physicsRunning ? 'pause' : 'start' });
@@ -619,6 +688,9 @@ physicsWorker.addEventListener('message', (event) => {
       simulationToggleButton.disabled = false;
     }
     updateStatus('Physics worker ready. Streaming hopper morph simulation…');
+    if (queuedStageId) {
+      physicsWorker.postMessage({ type: 'load-stage', stageId: queuedStageId });
+    }
     physicsWorker.postMessage({ type: 'start' });
   } else if (data.type === 'shared-state') {
     viewer.applySharedLayout(data.layout);
@@ -683,6 +755,21 @@ physicsWorker.addEventListener('message', (event) => {
     updateStatus('Replay playback finished.');
   } else if (data.type === 'replay-stopped') {
     updateStatus('Replay playback stopped.');
+  } else if (data.type === 'stage-loaded') {
+    const stage = getStageDefinition(data.stageId ?? activeStageId);
+    activeStageId = stage.id;
+    queuedStageId = stage.id;
+    if (viewControls) {
+      viewControls.setStage(stage.id);
+    }
+    if (viewer) {
+      viewer.setStage(stage.id);
+    }
+    const label = stage.label ?? stage.id;
+    updateStatus(`${label} stage ready. Simulation reset.`);
+  } else if (data.type === 'stage-error') {
+    console.error('Stage load failed:', data.message);
+    updateStatus('Unable to load the requested stage.');
   } else if (data.type === 'replay-error') {
     console.warn('Replay error:', data.message);
     updateStatus('Replay failed — see console for details.');
@@ -696,7 +783,8 @@ physicsWorker.addEventListener('message', (event) => {
 });
 
 evolutionPanel.onStart((config) => {
-  executeEvolutionRun({ config, resetStats: true });
+  const runConfig = { ...config, stageId: activeStageId };
+  executeEvolutionRun({ config: runConfig, resetStats: true });
 });
 
 evolutionPanel.onStop(() => {
@@ -744,6 +832,22 @@ const neuromorphsApi = {
       setLatestBestIndividual(null);
       updateStatus('Cleared stored evolution run.');
     }
+  },
+  stages: {
+    list() {
+      return listStages();
+    },
+    getActiveId() {
+      return activeStageId;
+    },
+    getActiveDefinition() {
+      return getStageDefinition(activeStageId);
+    },
+    load(stageId, options) {
+      const stage = getStageDefinition(stageId ?? activeStageId);
+      loadStage(stage.id, options);
+      return stage;
+    }
   }
 };
 
@@ -751,5 +855,6 @@ if (typeof window !== 'undefined') {
   const target = window.Neuromorphs ? { ...window.Neuromorphs } : {};
   target.replays = neuromorphsApi.replays;
   target.runs = neuromorphsApi.runs;
+  target.stages = neuromorphsApi.stages;
   window.Neuromorphs = target;
 }

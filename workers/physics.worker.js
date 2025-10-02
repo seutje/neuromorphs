@@ -21,6 +21,7 @@ import {
   horizontalDistanceToObjective
 } from '../public/environment/arena.js';
 import { MAX_JOINT_ANGULAR_DELTA } from '../public/physics/constants.js';
+import { DEFAULT_STAGE_ID, getStageDefinition } from '../public/environment/stages.js';
 
 function createInteractionGroup(membership, filter) {
   const membershipMask = membership & 0xffff;
@@ -40,6 +41,8 @@ let running = false;
 let ready = false;
 let stepHandle = null;
 let pendingStart = false;
+let requestedStageId = DEFAULT_STAGE_ID;
+let stageColliders = [];
 
 let sharedBuffer = null;
 let sharedMeta = null;
@@ -125,6 +128,54 @@ function clearCreature() {
   creatureJointMap.clear();
   controllerRuntime = null;
   replayRecorder.clear();
+}
+
+function clearStageColliders() {
+  if (!world || stageColliders.length === 0) {
+    stageColliders = [];
+    return;
+  }
+  stageColliders.forEach((collider) => {
+    if (collider) {
+      world.removeCollider(collider, true);
+    }
+  });
+  stageColliders = [];
+}
+
+function applyStageToWorld(stageId) {
+  const stage = getStageDefinition(stageId ?? requestedStageId);
+  if (!stage) {
+    return null;
+  }
+  requestedStageId = stage.id;
+  if (!world) {
+    return stage;
+  }
+  clearStageColliders();
+  if (Array.isArray(stage.obstacles)) {
+    stage.obstacles.forEach((obstacle) => {
+      if (!obstacle || obstacle.type !== 'box') {
+        return;
+      }
+      const halfExtents = obstacle.halfExtents ?? { x: 0.5, y: 0.5, z: 0.5 };
+      const translation = obstacle.translation ?? { x: 0, y: 0, z: 0 };
+      const colliderDesc = RAPIER.ColliderDesc.cuboid(
+        halfExtents.x ?? 0.5,
+        halfExtents.y ?? 0.5,
+        halfExtents.z ?? 0.5
+      )
+        .setTranslation(
+          translation.x ?? 0,
+          translation.y ?? 0,
+          translation.z ?? 0
+        )
+        .setCollisionGroups(COLLISION_GROUP_ENVIRONMENT);
+      const collider = world.createCollider(colliderDesc);
+      stageColliders.push(collider);
+    });
+  }
+  return stage;
 }
 
 function isReplayActive() {
@@ -679,6 +730,8 @@ async function initializeWorld() {
       .setCollisionGroups(COLLISION_GROUP_ENVIRONMENT);
     world.createCollider(objectiveCollider);
 
+    applyStageToWorld(requestedStageId);
+
     const defaultMorph = createDefaultMorphGenome();
     const defaultController = createDefaultControllerGenome();
     const spawned = instantiateCreature(defaultMorph, defaultController);
@@ -821,6 +874,27 @@ self.addEventListener('message', (event) => {
   } else if (data.type === 'reset') {
     stopReplayPlayback({ notify: false });
     resetCreature();
+  } else if (data.type === 'load-stage') {
+    const wasRunning = running;
+    const hadBodies = creatureBodies.size > 0;
+    setRunning(false);
+    stopReplayPlayback({ notify: false });
+    const stage = applyStageToWorld(data.stageId);
+    if (!stage) {
+      postMessage({ type: 'stage-error', message: 'Unable to resolve the requested stage.' });
+      return;
+    }
+    if (hadBodies) {
+      resetCreature();
+    } else if (ready) {
+      const defaultMorph = createDefaultMorphGenome();
+      const defaultController = createDefaultControllerGenome();
+      instantiateCreature(defaultMorph, defaultController);
+    }
+    if (wasRunning && ready) {
+      setRunning(true);
+    }
+    postMessage({ type: 'stage-loaded', stageId: stage.id });
   } else if (data.type === 'preview-individual') {
     const individual =
       data.individual && typeof data.individual === 'object' ? data.individual : null;

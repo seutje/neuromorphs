@@ -4,6 +4,7 @@ import { instantiateCreature } from './simulation/instantiateCreature.js';
 import { gatherSensorSnapshot } from './simulation/sensors.js';
 import { applyControllerCommands } from './simulation/controllerCommands.js';
 import { computeCenterOfMass } from './simulation/centerOfMass.js';
+import { DEFAULT_STAGE_ID } from '../environment/stages.js';
 
 function recordSample(instance, trace, timestamp, sensors) {
   const centerOfMass = computeCenterOfMass(instance);
@@ -21,10 +22,11 @@ export async function simulateLocomotion({
   duration = 60,
   timestep = 1 / 60,
   sampleInterval = 1 / 30,
-  signal
+  signal,
+  stageId = DEFAULT_STAGE_ID
 } = {}) {
   const RAPIER = await loadRapier();
-  const world = createSimulationWorld(RAPIER, timestep);
+  const world = createSimulationWorld(RAPIER, timestep, stageId);
 
   try {
     const instance = instantiateCreature(RAPIER, world, morphGenome, controllerGenome);

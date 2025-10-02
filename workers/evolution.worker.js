@@ -6,6 +6,7 @@ import {
   scoreLocomotionWithWeights
 } from '../public/evolution/fitness.js';
 import { createRng } from '../public/evolution/rng.js';
+import { DEFAULT_STAGE_ID } from '../public/environment/stages.js';
 
 const activeRuns = new Map();
 
@@ -111,7 +112,8 @@ self.addEventListener('message', async (event) => {
           duration: simulation?.duration,
           timestep: simulation?.timestep,
           sampleInterval: simulation?.sampleInterval,
-          signal: controller.signal
+          signal: controller.signal,
+          stageId: simulation?.stageId ?? DEFAULT_STAGE_ID
         });
         const metrics = computeLocomotionFitness(simulationResult.trace);
         const fitnessScore = scoreLocomotionWithWeights(metrics, weights);

@@ -8,6 +8,7 @@ import {
   objectiveToSelectionWeights,
   resolveSelectionWeights
 } from './fitness.js';
+import { DEFAULT_STAGE_ID } from '../environment/stages.js';
 
 function cloneValue(value) {
   return JSON.parse(JSON.stringify(value));
@@ -59,7 +60,8 @@ export async function runEvolutionDemo(options = {}) {
     selectionWeights = DEFAULT_SELECTION_WEIGHTS,
     simulationDuration = 60,
     simulationTimestep = 1 / 60,
-    simulationSampleInterval = 1 / 30
+    simulationSampleInterval = 1 / 30,
+    stageId = DEFAULT_STAGE_ID
   } = options;
 
   const mutationConfig = {
@@ -146,7 +148,8 @@ export async function runEvolutionDemo(options = {}) {
     simulation: {
       duration: simulationDuration,
       timestep: simulationTimestep,
-      sampleInterval: simulationSampleInterval
+      sampleInterval: simulationSampleInterval,
+      stageId
     }
   });
 

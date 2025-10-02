@@ -19,6 +19,7 @@ import {
   OBJECTIVE_POSITION,
   OBJECTIVE_SIZE
 } from '../environment/arena.js';
+import { DEFAULT_STAGE_ID, getStageDefinition } from '../environment/stages.js';
 
 const META_DEFAULT_VERSION_INDEX = 0;
 const META_DEFAULT_WRITE_LOCK_INDEX = 1;
@@ -84,6 +85,9 @@ export function createViewer(canvas) {
   objectiveMesh.receiveShadow = false;
   scene.add(objectiveMesh);
 
+  const stageGroup = new Group();
+  scene.add(stageGroup);
+
   const dynamicBodiesRoot = new Group();
   scene.add(dynamicBodiesRoot);
 
@@ -97,6 +101,8 @@ export function createViewer(canvas) {
   const lastPrimaryPosition = new Vector3();
 
   let sharedState = null;
+  let activeStageId = DEFAULT_STAGE_ID;
+  let stageMeshes = [];
 
   function resize() {
     const width = canvas.clientWidth;
@@ -111,6 +117,58 @@ export function createViewer(canvas) {
 
   window.addEventListener('resize', resize);
   resize();
+
+  function disposeStageMeshes() {
+    stageMeshes.forEach((mesh) => {
+      if (mesh.geometry) {
+        mesh.geometry.dispose();
+      }
+      if (mesh.material) {
+        mesh.material.dispose();
+      }
+      stageGroup.remove(mesh);
+    });
+    stageMeshes = [];
+  }
+
+  function createStageMesh(obstacle) {
+    if (!obstacle || obstacle.type !== 'box') {
+      return null;
+    }
+    const halfExtents = obstacle.halfExtents ?? { x: 0.5, y: 0.5, z: 0.5 };
+    const translation = obstacle.translation ?? { x: 0, y: 0, z: 0 };
+    const width = (halfExtents.x ?? 0.5) * 2;
+    const height = (halfExtents.y ?? 0.5) * 2;
+    const depth = (halfExtents.z ?? 0.5) * 2;
+    const color = obstacle.material?.color ?? '#f97316';
+    const roughness = obstacle.material?.roughness ?? 0.5;
+    const metalness = obstacle.material?.metalness ?? 0.18;
+    const geometry = new BoxGeometry(width, height, depth);
+    const material = new MeshStandardMaterial({ color, roughness, metalness });
+    const mesh = new Mesh(geometry, material);
+    mesh.position.set(translation.x ?? 0, translation.y ?? 0, translation.z ?? 0);
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    return mesh;
+  }
+
+  function applyStage(stageId = DEFAULT_STAGE_ID) {
+    const stage = getStageDefinition(stageId);
+    if (!stage) {
+      return;
+    }
+    disposeStageMeshes();
+    if (Array.isArray(stage.obstacles)) {
+      stage.obstacles.forEach((obstacle) => {
+        const mesh = createStageMesh(obstacle);
+        if (mesh) {
+          stageGroup.add(mesh);
+          stageMeshes.push(mesh);
+        }
+      });
+    }
+    activeStageId = stage.id;
+  }
 
   function ensureSharedBodyMesh(descriptor) {
     if (!descriptor || typeof descriptor.id !== 'string') {
@@ -342,6 +400,7 @@ export function createViewer(canvas) {
     renderer.render(scene, camera);
   }
 
+  applyStage(DEFAULT_STAGE_ID);
   renderer.setAnimationLoop(renderFrame);
   return {
     applySharedLayout,
@@ -361,6 +420,12 @@ export function createViewer(canvas) {
     },
     isSharedStateActive() {
       return Boolean(sharedState);
+    },
+    setStage(stageId) {
+      applyStage(stageId);
+    },
+    getStageId() {
+      return activeStageId;
     },
     getPrimaryBodyPosition() {
       return lastPrimaryPosition.clone();
