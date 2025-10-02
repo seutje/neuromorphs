@@ -20,7 +20,7 @@ import {
   OBJECTIVE_POSITION,
   horizontalDistanceToObjective
 } from '../public/environment/arena.js';
-import { MAX_JOINT_ANGULAR_DELTA } from '../public/physics/constants.js';
+import { MAX_JOINT_ANGULAR_DELTA, MAX_JOINT_TARGET_SPEED } from '../public/physics/constants.js';
 import { DEFAULT_STAGE_ID, getStageDefinition } from '../public/environment/stages.js';
 
 function createInteractionGroup(membership, filter) {
@@ -770,9 +770,7 @@ function applyControllerCommands(result) {
       return;
     }
     const commandValue = clamp(command.value ?? 0, -1, 1);
-    if (commandValue === 0) {
-      return;
-    }
+    const targetSpeed = commandValue * MAX_JOINT_TARGET_SPEED;
     const parentInertiaMatrix = parentEntry.body.effectiveAngularInertia(normalizedAxis);
     const childInertiaMatrix = childEntry.body.effectiveAngularInertia(normalizedAxis);
     const parentInertia = projectAngularInertia(parentInertiaMatrix, [
@@ -789,8 +787,39 @@ function applyControllerCommands(result) {
     if (!Number.isFinite(baseInertia) || baseInertia <= 0) {
       return;
     }
-    const impulseMagnitude = commandValue * baseInertia * MAX_JOINT_ANGULAR_DELTA;
-    if (impulseMagnitude === 0) {
+    const parentAngvel = parentEntry.body.angvel();
+    const childAngvel = childEntry.body.angvel();
+    if (
+      !parentAngvel ||
+      !childAngvel ||
+      !Number.isFinite(parentAngvel.x) ||
+      !Number.isFinite(parentAngvel.y) ||
+      !Number.isFinite(parentAngvel.z) ||
+      !Number.isFinite(childAngvel.x) ||
+      !Number.isFinite(childAngvel.y) ||
+      !Number.isFinite(childAngvel.z)
+    ) {
+      return;
+    }
+    const parentSpeed =
+      parentAngvel.x * normalizedAxis.x +
+      parentAngvel.y * normalizedAxis.y +
+      parentAngvel.z * normalizedAxis.z;
+    const childSpeed =
+      childAngvel.x * normalizedAxis.x +
+      childAngvel.y * normalizedAxis.y +
+      childAngvel.z * normalizedAxis.z;
+    const relativeSpeed = childSpeed - parentSpeed;
+    let speedError = targetSpeed - relativeSpeed;
+    if (!Number.isFinite(speedError)) {
+      return;
+    }
+    const clampedError = clamp(speedError, -MAX_JOINT_ANGULAR_DELTA, MAX_JOINT_ANGULAR_DELTA);
+    if (Math.abs(clampedError) < 1e-4) {
+      return;
+    }
+    const impulseMagnitude = clampedError * baseInertia;
+    if (!Number.isFinite(impulseMagnitude) || Math.abs(impulseMagnitude) < 1e-6) {
       return;
     }
     const torque = {
