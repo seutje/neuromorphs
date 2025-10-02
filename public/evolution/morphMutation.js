@@ -32,6 +32,62 @@ function createIdGenerator(values, prefix) {
   };
 }
 
+function normalizeVector3(vector, fallback = [0, 0, 0]) {
+  if (!Array.isArray(vector) || vector.length !== 3) {
+    return [...fallback];
+  }
+  return vector.map((component, index) => {
+    const value = Number(component);
+    return Number.isFinite(value) ? value : fallback[index];
+  });
+}
+
+function normalizeHalfExtents(extents, fallback = [0.3, 0.3, 0.3]) {
+  if (!Array.isArray(extents) || extents.length !== 3) {
+    return [...fallback];
+  }
+  return extents.map((component, index) => {
+    const value = Math.abs(Number(component));
+    const fallbackValue = Math.abs(Number(fallback[index]));
+    if (!Number.isFinite(value) || value <= 0) {
+      return Math.max(0.1, fallbackValue || 0.1);
+    }
+    return Math.max(0.1, value);
+  });
+}
+
+function boxesOverlap(positionA, halfExtentsA, positionB, halfExtentsB) {
+  for (let axis = 0; axis < 3; axis += 1) {
+    const extentA = Math.abs(Number(halfExtentsA[axis])) || 0;
+    const extentB = Math.abs(Number(halfExtentsB[axis])) || 0;
+    const separation = extentA + extentB;
+    const margin = Math.min(0.01, separation * 0.25);
+    const distance = Math.abs(
+      (Number(positionA[axis]) || 0) - (Number(positionB[axis]) || 0)
+    );
+    if (distance >= separation - margin) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function shuffle(array, rng) {
+  if (!Array.isArray(array)) {
+    return [];
+  }
+  const result = array.slice();
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = rng && typeof rng.int === 'function'
+      ? rng.int(index + 1)
+      : Math.floor(Math.random() * (index + 1));
+    const temp = result[index];
+    result[index] = result[swapIndex];
+    result[swapIndex] = temp;
+  }
+  return result;
+}
+
 function mutateAddLimb(genome, rng) {
   const bodies = Array.isArray(genome.bodies) ? genome.bodies : [];
   if (bodies.length === 0) {
@@ -44,13 +100,16 @@ function mutateAddLimb(genome, rng) {
   if (!parent) {
     return false;
   }
-  const parentExtents = Array.isArray(parent.halfExtents)
-    ? parent.halfExtents.map((value) => Math.max(Math.abs(Number(value)) || 0.3, 0.1))
-    : [0.3, 0.3, 0.3];
+  const parentExtents = normalizeHalfExtents(parent.halfExtents, [0.3, 0.3, 0.3]);
   const newHalfExtents = parentExtents.map((extent) =>
     Math.max(0.12, extent * rng.range(0.45, 0.85))
   );
-  const direction = pickRandom(
+  const existingChildren = bodies.filter(
+    (body) => body?.joint?.parentId === parent.id
+  );
+  let selectedDirection = null;
+  let selectedOffset = null;
+  shuffle(
     [
       [0, -1, 0],
       [0, 1, 0],
@@ -60,7 +119,35 @@ function mutateAddLimb(genome, rng) {
       [0, 0, -1]
     ],
     rng
-  ) ?? [0, -1, 0];
+  ).some((candidate) => {
+    const candidateOffset = [
+      candidate[0] * (parentExtents[0] + newHalfExtents[0]),
+      candidate[1] * (parentExtents[1] + newHalfExtents[1]),
+      candidate[2] * (parentExtents[2] + newHalfExtents[2])
+    ];
+    const overlaps = existingChildren.some((sibling) => {
+      if (!sibling || typeof sibling !== 'object') {
+        return false;
+      }
+      const siblingExtents = normalizeHalfExtents(sibling.halfExtents, newHalfExtents);
+      const siblingPosition = normalizeVector3(sibling.pose?.position, [0, 0, 0]);
+      return boxesOverlap(
+        candidateOffset,
+        newHalfExtents,
+        siblingPosition,
+        siblingExtents
+      );
+    });
+    if (!overlaps) {
+      selectedDirection = candidate;
+      selectedOffset = candidateOffset;
+      return true;
+    }
+    return false;
+  });
+  if (!selectedDirection || !selectedOffset) {
+    return false;
+  }
   const axis = pickRandom(
     [
       [1, 0, 0],
@@ -70,11 +157,8 @@ function mutateAddLimb(genome, rng) {
     rng
   ) ?? [0, 0, 1];
   const idGenerator = createIdGenerator(bodies.map((body) => body.id), 'limb');
-  const offset = [
-    direction[0] * (parentExtents[0] + newHalfExtents[0]),
-    direction[1] * (parentExtents[1] + newHalfExtents[1]),
-    direction[2] * (parentExtents[2] + newHalfExtents[2])
-  ];
+  const direction = selectedDirection;
+  const offset = selectedOffset;
   const parentAnchor = [
     direction[0] * parentExtents[0],
     direction[1] * parentExtents[1],
