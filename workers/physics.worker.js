@@ -833,17 +833,13 @@ async function initializeWorld() {
 
     applyStageToWorld(requestedStageId);
 
-    const defaultMorph = createDefaultMorphGenome();
-    const defaultController = createDefaultControllerGenome();
-    const spawned = instantiateCreature(defaultMorph, defaultController);
-    if (!spawned) {
-      throw new Error('Default morph failed to spawn.');
-    }
+    configureSharedState([], {});
+    syncSharedState();
 
     ready = true;
     postMessage({
       type: 'ready',
-      message: 'Rapier worker ready. Default morph spawned.'
+      message: 'Rapier worker ready. Awaiting creature spawn.'
     });
 
     if (pendingStart) {

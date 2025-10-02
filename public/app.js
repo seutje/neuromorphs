@@ -820,7 +820,7 @@ physicsWorker.addEventListener('message', (event) => {
     if (simulationToggleButton) {
       simulationToggleButton.disabled = false;
     }
-    updateStatus('Physics worker ready. Streaming hopper morph simulation…');
+    updateStatus('Physics worker ready. Streaming catdog morph simulation…');
     if (queuedStageId) {
       physicsWorker.postMessage({ type: 'load-stage', stageId: queuedStageId });
     }
@@ -830,7 +830,7 @@ physicsWorker.addEventListener('message', (event) => {
     if (data.buffer instanceof SharedArrayBuffer) {
       viewer.setSharedStateBuffer(data.buffer, data.layout);
       sharedStateEnabled = true;
-      updateStatus('Shared memory bridge established. Hopper pose updates are live.');
+      updateStatus('Shared memory bridge established. Catdog pose updates are live.');
     } else {
       viewer.clearSharedState();
       sharedStateEnabled = false;
@@ -844,7 +844,7 @@ physicsWorker.addEventListener('message', (event) => {
       updateStatus(
         physicsRunning
           ? 'Physics worker stepping. Awaiting shared memory access…'
-          : 'Simulation paused. Resume to continue the hopper test.'
+          : 'Simulation paused. Resume to continue the catdog test.'
       );
     }
   } else if (data.type === 'tick') {
@@ -859,7 +859,7 @@ physicsWorker.addEventListener('message', (event) => {
         }
       }
     } else if (physicsRunning) {
-      updateStatus('Shared memory synchronized. Hopper pose streaming from worker.');
+      updateStatus('Shared memory synchronized. Catdog pose streaming from worker.');
     }
     if (data.sensors?.summary && typeof data.timestamp === 'number') {
       if (data.timestamp - sensorLogTimestamp >= 500) {
