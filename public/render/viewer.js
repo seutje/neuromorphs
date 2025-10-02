@@ -54,13 +54,16 @@ export function createViewer(canvas) {
   canvas.addEventListener(
     'wheel',
     (event) => {
-      if (event.ctrlKey) {
+      const previousEnableZoom = controls.enableZoom;
+      const allowZoom = event.ctrlKey;
+      controls.enableZoom = allowZoom;
+      if (allowZoom) {
         event.preventDefault();
-        return;
+      } else {
+        event.stopImmediatePropagation();
       }
-      controls.enableZoom = false;
       const restoreZoom = () => {
-        controls.enableZoom = true;
+        controls.enableZoom = previousEnableZoom;
       };
       if (typeof queueMicrotask === 'function') {
         queueMicrotask(restoreZoom);
@@ -68,7 +71,7 @@ export function createViewer(canvas) {
         Promise.resolve().then(restoreZoom);
       }
     },
-    { passive: false }
+    { passive: false, capture: true }
   );
 
   const ambient = new AmbientLight('#e2e8f0', 0.6);
