@@ -1,5 +1,4 @@
 const RUN_STATE_KEY = 'neuromorphs:last-run';
-const REPLAY_KEY = 'neuromorphs:last-replay';
 const RUN_STATE_VERSION = 1;
 const MODEL_COLLECTION_KEY = 'neuromorphs:saved-models';
 const MODEL_COLLECTION_VERSION = 1;
@@ -159,86 +158,6 @@ export function clearRunState(options = {}) {
     return true;
   } catch (error) {
     console.warn('Failed to clear stored run state:', error);
-    return false;
-  }
-}
-
-export function saveReplayRecord(record, options = {}) {
-  if (!record || (typeof record.json !== 'string' && !(record.buffer instanceof ArrayBuffer))) {
-    return false;
-  }
-  const storage = resolveStorage(options.storage);
-  if (!storage) {
-    return false;
-  }
-  let json = record.json;
-  if (typeof json !== 'string' && record.buffer instanceof ArrayBuffer) {
-    try {
-      json = new TextDecoder().decode(record.buffer);
-    } catch (error) {
-      console.warn('Failed to decode replay buffer for storage:', error);
-      return false;
-    }
-  }
-  if (typeof json !== 'string') {
-    return false;
-  }
-  const payload = {
-    version: RUN_STATE_VERSION,
-    updatedAt: Date.now(),
-    metadata: record.metadata ?? null,
-    json
-  };
-  try {
-    storage.setItem(REPLAY_KEY, JSON.stringify(payload));
-    return true;
-  } catch (error) {
-    console.warn('Failed to store replay record:', error);
-    return false;
-  }
-}
-
-export function loadReplayRecord(options = {}) {
-  const storage = resolveStorage(options.storage);
-  if (!storage) {
-    return null;
-  }
-  const raw = storage.getItem(REPLAY_KEY);
-  if (!raw) {
-    return null;
-  }
-  try {
-    const data = JSON.parse(raw);
-    if (!data || typeof data !== 'object') {
-      return null;
-    }
-    if (data.version !== RUN_STATE_VERSION || typeof data.json !== 'string') {
-      return null;
-    }
-    const encoder = new TextEncoder();
-    const buffer = encoder.encode(data.json).buffer;
-    return {
-      metadata: data.metadata ?? null,
-      json: data.json,
-      buffer,
-      updatedAt: data.updatedAt ?? null
-    };
-  } catch (error) {
-    console.warn('Failed to read stored replay record:', error);
-    return null;
-  }
-}
-
-export function clearReplayRecord(options = {}) {
-  const storage = resolveStorage(options.storage);
-  if (!storage) {
-    return false;
-  }
-  try {
-    storage.removeItem(REPLAY_KEY);
-    return true;
-  } catch (error) {
-    console.warn('Failed to clear replay record:', error);
     return false;
   }
 }

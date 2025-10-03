@@ -154,13 +154,13 @@
   - **Outputs:** ArrayBuffer of replay frames
   - **DoD:** Playback matches original run
   - **Dependencies:** P3-03
-  - **Status:** Worker records controller commands each tick, emits serialized replay buffers, and supports deterministic playback on demand.
+  - **Status:** Initial recorder landed but has since been removed from runtime to avoid bloating localStorage; revisit with a streaming/export flow later.
 - [x] **P6-02: Local Storage for Runs**
   - **Owner:** Platform Agent
   - **Outputs:** Save/load JSON of genomes + fitness
   - **DoD:** Reload page → run resumes
   - **Dependencies:** P4-01, P6-01
-  - **Status:** Evolution snapshots persist to localStorage, auto-resume restores config/history, and latest replays are retained with browser-side playback helpers.
+  - **Status:** Evolution snapshots persist to localStorage and auto-resume restores config/history; replay persistence is disabled until a leaner format ships.
 
 ---
 

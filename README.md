@@ -9,9 +9,9 @@ runs, and a Web Worker that hosts Rapier physics so the main thread can focus on
 - **Interactive viewer** powered by Three.js with orbit/follow camera modes and a live simulation toggle.
 - **Synthetic evolution demo** that mutates morph and controller genomes, evaluates fitness, and streams
   progress updates into the UI.
-- **Run persistence** that serializes the last evolution run and replay trace into `localStorage`, enabling
+- **Run persistence** that serializes the last evolution run into `localStorage`, enabling
   resume-and-review flows across page reloads.
-- **Physics worker scaffold** that boots a Rapier world off the main thread and responds to play/pause/replay
+- **Physics worker scaffold** that boots a Rapier world off the main thread and responds to play/pause
   messages from the UI.
 
 ## Quickstart
@@ -58,7 +58,7 @@ public/app.js           # App orchestration, evolution control, and persistence 
 public/evolution/       # Evolution engine, fitness metrics, genomes, and RNG helpers
 public/render/          # Three.js viewer composition and view controls
 public/ui/              # DOM panels for evolution controls and stats readout
-public/persistence/     # Local storage adapters for runs and replay data
+public/persistence/     # Local storage adapters for evolution runs and saved models
 workers/physics.worker.js # Rapier-driven worker for background simulation hooks
 genomes/                # Canonical genome schemas shared across UI/worker/tests
 scripts/dev-server.mjs  # Static file server with COOP/COEP headers for SharedArrayBuffer use

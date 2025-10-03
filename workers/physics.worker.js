@@ -9,11 +9,6 @@ import {
 } from '../genomes/ctrlGenome.js';
 import { createControllerRuntime } from './controllerRuntime.js';
 import {
-  createReplayRecorder,
-  decodeReplayBuffer,
-  createReplayPlayback
-} from './replayRecorder.js';
-import {
   ARENA_FLOOR_Y,
   ARENA_HALF_EXTENTS,
   OBJECTIVE_HALF_EXTENTS,
@@ -58,8 +53,6 @@ let creatureJointMap = new Map();
 let sharedMaterialMap = {};
 let additionalInstanceCount = 0;
 const controllerInstances = new Map();
-let replayRecorder = createReplayRecorder();
-let activeReplay = null;
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -191,7 +184,6 @@ function clearCreature() {
   sharedMaterialMap = {};
   additionalInstanceCount = 0;
   controllerInstances.clear();
-  replayRecorder.clear();
 }
 
 function clearStageColliders() {
@@ -240,77 +232,6 @@ function applyStageToWorld(stageId) {
     });
   }
   return stage;
-}
-
-function isReplayActive() {
-  return Boolean(activeReplay);
-}
-
-function startReplayRecording() {
-  if (isReplayActive()) {
-    return;
-  }
-  if (!world) {
-    return;
-  }
-  replayRecorder.start({
-    jointDescriptors: creatureJointDescriptors,
-    actuatorIds: collectControllerActuatorIds(),
-    timestep: world.timestep ?? 1 / 60
-  });
-}
-
-function stopReplayRecording() {
-  if (isReplayActive()) {
-    return;
-  }
-  if (!replayRecorder.isRecording()) {
-    return;
-  }
-  const metadata = replayRecorder.getMetadata();
-  const buffer = replayRecorder.stop();
-  if (buffer) {
-    postMessage(
-      {
-        type: 'replay-recorded',
-        buffer,
-        metadata
-      },
-      [buffer]
-    );
-  }
-}
-
-function stopReplayPlayback({ notify = true } = {}) {
-  if (!isReplayActive()) {
-    return;
-  }
-  activeReplay = null;
-  if (notify) {
-    postMessage({ type: 'replay-stopped' });
-  }
-}
-
-function startReplayPlayback(buffer) {
-  if (!(buffer instanceof ArrayBuffer)) {
-    postMessage({ type: 'replay-error', message: 'Replay buffer missing or invalid.' });
-    return false;
-  }
-  const decoded = decodeReplayBuffer(buffer);
-  if (!decoded || !Array.isArray(decoded.frames) || decoded.frames.length === 0) {
-    postMessage({ type: 'replay-error', message: 'Replay data could not be decoded.' });
-    return false;
-  }
-  resetCreature();
-  activeReplay = createReplayPlayback(decoded);
-  if (!activeReplay || activeReplay.getFrameCount() === 0) {
-    activeReplay = null;
-    postMessage({ type: 'replay-error', message: 'Replay contains no frames.' });
-    return false;
-  }
-  postMessage({ type: 'replay-started', metadata: activeReplay.getMetadata?.() ?? null });
-  setRunning(true);
-  return true;
 }
 
 function configureSharedState(bodyDescriptors, materials) {
@@ -864,18 +785,12 @@ function setRunning(next) {
   }
   running = next;
   if (running) {
-    if (!isReplayActive()) {
-      startReplayRecording();
-    }
     if (stepHandle === null) {
       stepHandle = setInterval(stepSimulation, 16);
     }
   } else if (stepHandle !== null) {
     clearInterval(stepHandle);
     stepHandle = null;
-    if (!isReplayActive()) {
-      stopReplayRecording();
-    }
   }
   postMessage({ type: 'state', running });
 }
@@ -889,25 +804,7 @@ function stepSimulation() {
   const sensors = gatherSensorSnapshot();
   const commands = [];
   let controllerTelemetry = null;
-  if (isReplayActive()) {
-    const frame = activeReplay.next();
-    if (!frame) {
-      stopReplayPlayback({ notify: false });
-      setRunning(false);
-      postMessage({ type: 'replay-complete' });
-      return;
-    }
-    frame.commands.forEach((command) => {
-      if (!command || typeof command.targetId !== 'string') {
-        return;
-      }
-      commands.push({
-        id: typeof command.actuatorId === 'string' ? command.actuatorId : null,
-        target: { type: 'joint', id: command.targetId },
-        value: command.value
-      });
-    });
-  } else if (controllerInstances.size > 0) {
+  if (controllerInstances.size > 0) {
     const runtimeResults = [];
     controllerInstances.forEach((instance, key) => {
       const runtime = instance?.runtime;
@@ -965,10 +862,6 @@ function stepSimulation() {
     applyControllerCommands({ commands });
   }
 
-  if (!isReplayActive() && replayRecorder.isRecording()) {
-    replayRecorder.record({ dt, commands });
-  }
-
   world.step();
 
   if (sharedFloats) {
@@ -1006,7 +899,7 @@ function stepSimulation() {
     const rootEntry = creatureBodies.get(rootId);
     if (rootEntry) {
       const translation = rootEntry.body.translation();
-      if (!isReplayActive() && translation.y < -10) {
+      if (translation.y < -10) {
         resetCreature();
       }
     }
@@ -1023,13 +916,11 @@ self.addEventListener('message', (event) => {
   } else if (data.type === 'pause') {
     setRunning(false);
   } else if (data.type === 'reset') {
-    stopReplayPlayback({ notify: false });
     resetCreature();
   } else if (data.type === 'load-stage') {
     const wasRunning = running;
     const hadBodies = creatureBodies.size > 0;
     setRunning(false);
-    stopReplayPlayback({ notify: false });
     const stage = applyStageToWorld(data.stageId);
     if (!stage) {
       postMessage({ type: 'stage-error', message: 'Unable to resolve the requested stage.' });
@@ -1049,7 +940,6 @@ self.addEventListener('message', (event) => {
     if (wasRunning) {
       setRunning(false);
     }
-    stopReplayPlayback({ notify: false });
     clearCreature();
     configureSharedState([], {});
     syncSharedState();
@@ -1057,7 +947,6 @@ self.addEventListener('message', (event) => {
   } else if (data.type === 'preview-individual') {
     const individual =
       data.individual && typeof data.individual === 'object' ? data.individual : null;
-    stopReplayPlayback({ notify: false });
     setRunning(false);
     const spawned = instantiateCreature(individual?.morph, individual?.controller);
     if (spawned) {
@@ -1085,17 +974,6 @@ self.addEventListener('message', (event) => {
     if (wasRunning) {
       setRunning(true);
     }
-  } else if (data.type === 'play-replay') {
-    const buffer = data.buffer instanceof ArrayBuffer ? data.buffer : null;
-    if (!buffer) {
-      postMessage({ type: 'replay-error', message: 'Replay buffer missing.' });
-      return;
-    }
-    startReplayPlayback(buffer);
-  } else if (data.type === 'stop-replay') {
-    stopReplayPlayback();
-    setRunning(false);
-    resetCreature();
   }
 });
 

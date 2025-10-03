@@ -15,9 +15,6 @@ import {
   saveRunState,
   loadRunState,
   clearRunState,
-  saveReplayRecord,
-  loadReplayRecord,
-  clearReplayRecord,
   saveModelRecord,
   loadModelRecord,
   listModelRecords,
@@ -68,8 +65,6 @@ const QUAD_MODEL_URL = new URL('../models/quad.json', import.meta.url);
 const QUAD_MODEL_ID = 'df9d6c08-6b1a-4fa5-9d16-f6a74b8c4f8f';
 const QUAD_MODEL_NAME = 'quad';
 
-const textEncoder = new TextEncoder();
-const textDecoder = new TextDecoder();
 const DOM_UPDATE_INTERVAL_MS = 200;
 let statusTextCache = statusMessage?.textContent ?? '';
 const statusUpdateQueue = createUpdateQueue({
@@ -96,7 +91,6 @@ const statusUpdateQueue = createUpdateQueue({
 });
 
 let persistedRunState = loadRunState() ?? null;
-let latestReplay = loadReplayRecord() ?? null;
 let latestBestIndividual = null;
 let activeRunConfig = null;
 let activeRunTotalGenerations = 0;
@@ -660,33 +654,6 @@ function handleRunComplete(result) {
   generationViewer?.jumpToLatest({ silent: true });
 }
 
-function getReplayBuffer(record) {
-  if (!record || typeof record.json !== 'string') {
-    return null;
-  }
-  return textEncoder.encode(record.json).buffer;
-}
-
-function storeReplay(buffer, metadata) {
-  if (!(buffer instanceof ArrayBuffer)) {
-    return;
-  }
-  try {
-    const json = textDecoder.decode(buffer);
-    latestReplay = {
-      json,
-      metadata: metadata ?? null,
-      updatedAt: Date.now()
-    };
-    saveReplayRecord({ json, metadata });
-    updateStatus(
-      'Replay captured. Call window.Neuromorphs.replays.playLatest() to watch the playback.'
-    );
-  } catch (error) {
-    console.warn('Failed to store replay:', error);
-  }
-}
-
 function resolveAbortedResumeState(config) {
   if (!config) {
     return null;
@@ -1210,16 +1177,6 @@ physicsWorker.addEventListener('message', (event) => {
         sensorLogTimestamp = data.timestamp;
       }
     }
-  } else if (data.type === 'replay-recorded') {
-    if (data.buffer instanceof ArrayBuffer) {
-      storeReplay(data.buffer, data.metadata ?? null);
-    }
-  } else if (data.type === 'replay-started') {
-    updateStatus('Playing recorded replay…');
-  } else if (data.type === 'replay-complete') {
-    updateStatus('Replay playback finished.');
-  } else if (data.type === 'replay-stopped') {
-    updateStatus('Replay playback stopped.');
   } else if (data.type === 'stage-loaded') {
     const stage = getStageDefinition(data.stageId ?? activeStageId);
     activeStageId = stage.id;
@@ -1239,9 +1196,6 @@ physicsWorker.addEventListener('message', (event) => {
   } else if (data.type === 'stage-error') {
     console.error('Stage load failed:', data.message);
     updateStatus('Unable to load the requested stage.');
-  } else if (data.type === 'replay-error') {
-    console.warn('Replay error:', data.message);
-    updateStatus('Replay failed — see console for details.');
   } else if (data.type === 'error') {
     console.error('Physics worker failed to initialize:', data.message);
     updateStatus('Physics worker failed to start. Check the console for details.');
@@ -1285,31 +1239,6 @@ evolutionPanel.onStop(() => {
 });
 
 const neuromorphsApi = {
-  replays: {
-    hasReplay() {
-      return Boolean(latestReplay);
-    },
-    getMetadata() {
-      return latestReplay?.metadata ?? null;
-    },
-    playLatest() {
-      if (!latestReplay) {
-        console.warn('No replay available yet.');
-        return;
-      }
-      const buffer = getReplayBuffer(latestReplay);
-      if (!buffer) {
-        console.warn('Replay data is unavailable.');
-        return;
-      }
-      physicsWorker.postMessage({ type: 'play-replay', buffer }, [buffer]);
-    },
-    clear() {
-      latestReplay = null;
-      clearReplayRecord();
-      updateStatus('Cleared stored replay data.');
-    }
-  },
   runs: {
     getState() {
       return persistedRunState ? deepClone(persistedRunState) : null;
@@ -1344,7 +1273,6 @@ const neuromorphsApi = {
 
 if (typeof window !== 'undefined') {
   const target = window.Neuromorphs ? { ...window.Neuromorphs } : {};
-  target.replays = neuromorphsApi.replays;
   target.runs = neuromorphsApi.runs;
   target.stages = neuromorphsApi.stages;
   window.Neuromorphs = target;

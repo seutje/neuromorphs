@@ -5,14 +5,14 @@ Recreate the spirit of Karl Sims’ 1994 experiments—evolving articulated soft
 
 **Core pillars**
 - **Faithful ideas**: block-based morphologies, articulated joints, networked controllers, fitness via task environments (locomotion, swimming, jumping, fighting/pushing blocks).
-- **Modern UX**: real-time 3D with cinematic cameras, time controls, replay/ghosting, shareable links, and small social features.
+- **Modern UX**: real-time 3D with cinematic cameras, time controls, replay/ghosting (temporarily disabled pending storage redesign), shareable links, and small social features.
 - **Performance-first**: WASM physics, parallel evaluation, compact genomes, deterministic seeds.
 - **Explainability**: genome inspector, controller graph viewer, fitness trace, mutation diffs.
 
 ---
 
 ## 2) High-Level Scope
-- **In-scope**: Web app (SPA), evolution engine, physics-based simulation, rendering/UX, persistent runs, import/export, simple leaderboards, deterministic replays.
+- **In-scope**: Web app (SPA), evolution engine, physics-based simulation, rendering/UX, persistent runs, import/export, simple leaderboards, deterministic replays (deferred until a lean storage format is ready).
 - **Out-of-scope (v1)**: Multiplayer synchronous co-evolution; fluid simulation; ML backends; mobile AR; full soft-body FEM.
 
 ---
@@ -316,4 +316,3 @@ Replay {
   frames: [ { t, jointTargets:[...], externalForces:[...] } ]
 }
 ```
-

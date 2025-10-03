@@ -2,9 +2,6 @@ import {
   saveRunState,
   loadRunState,
   clearRunState,
-  saveReplayRecord,
-  loadReplayRecord,
-  clearReplayRecord,
   saveModelRecord,
   loadModelRecord,
   listModelRecords,
@@ -48,22 +45,6 @@ describe('runStorage', () => {
     expect(loaded.population).toHaveLength(1);
     clearRunState({ storage });
     expect(loadRunState({ storage })).toBeNull();
-  });
-
-  test('replay record persists as json and reconstructs buffer', () => {
-    const storage = createMockStorage();
-    const payload = JSON.stringify({ metadata: { version: 1 }, frames: [] });
-    const encoder = new TextEncoder();
-    const buffer = encoder.encode(payload).buffer;
-    expect(saveReplayRecord({ buffer, metadata: { version: 1 } }, { storage })).toBe(true);
-    const record = loadReplayRecord({ storage });
-    expect(record).toBeTruthy();
-    expect(record.metadata.version).toBe(1);
-    const decoder = new TextDecoder();
-    const decoded = decoder.decode(record.buffer);
-    expect(decoded).toBe(payload);
-    clearReplayRecord({ storage });
-    expect(loadReplayRecord({ storage })).toBeNull();
   });
 
   test('saves, lists, and loads named model records', () => {
