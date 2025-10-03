@@ -7,6 +7,33 @@ import { OBJECTIVE_POSITION } from '../public/environment/arena.js';
 import { runEvolution } from '../public/evolution/evolutionEngine.js';
 import { simulateLocomotion } from '../public/evolution/simulator.js';
 
+function createResizeOnlyRng(targetIndex = 0) {
+  return {
+    bool(probability = 0.5) {
+      if (!Number.isFinite(probability)) {
+        return false;
+      }
+      if (probability <= 0) {
+        return false;
+      }
+      if (probability >= 1) {
+        return true;
+      }
+      return probability > 0.5;
+    },
+    range(min, _max) {
+      return Number.isFinite(min) ? min : 0.75;
+    },
+    int(max) {
+      if (!Number.isFinite(max) || max <= 0) {
+        return 0;
+      }
+      const clamped = Math.max(0, Math.min(targetIndex, max - 1));
+      return clamped;
+    }
+  };
+}
+
 describe('simulateLocomotion', () => {
   jest.setTimeout(20000);
 
@@ -107,6 +134,50 @@ describe('morph genome mutations', () => {
     expect(operations.length).toBeGreaterThan(0);
     expect(genome).not.toBe(base);
     expect(JSON.stringify(genome)).not.toEqual(JSON.stringify(base));
+  });
+
+  it('keeps child joint anchors inside the resized body extents', () => {
+    const base = createDefaultMorphGenome();
+    const rng = createResizeOnlyRng(1);
+
+    const { genome } = mutateMorphGenome(base, rng, {
+      addLimbChance: 0,
+      resizeChance: 1,
+      jointJitterChance: 0
+    });
+
+    const leg = genome.bodies.find((body) => body.id === 'leg');
+    expect(leg).toBeDefined();
+    expect(Array.isArray(leg?.joint?.childAnchor)).toBe(true);
+    const childAnchor = leg?.joint?.childAnchor ?? [0, 0, 0];
+    leg.halfExtents.forEach((extent, index) => {
+      expect(Math.abs(childAnchor[index])).toBeLessThanOrEqual(
+        Math.abs(extent) + 1e-6
+      );
+    });
+  });
+
+  it('clamps parent anchors on children when resizing a parent body', () => {
+    const base = createDefaultMorphGenome();
+    const rng = createResizeOnlyRng(0);
+
+    const { genome } = mutateMorphGenome(base, rng, {
+      addLimbChance: 0,
+      resizeChance: 1,
+      jointJitterChance: 0
+    });
+
+    const torso = genome.bodies.find((body) => body.id === 'torso');
+    const leg = genome.bodies.find((body) => body.id === 'leg');
+    expect(torso).toBeDefined();
+    expect(leg).toBeDefined();
+    expect(Array.isArray(leg?.joint?.parentAnchor)).toBe(true);
+    const parentAnchor = leg?.joint?.parentAnchor ?? [0, 0, 0];
+    torso.halfExtents.forEach((extent, index) => {
+      expect(Math.abs(parentAnchor[index])).toBeLessThanOrEqual(
+        Math.abs(extent) + 1e-6
+      );
+    });
   });
 });
 

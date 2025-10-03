@@ -58,6 +58,34 @@ function normalizeHalfExtents(extents, fallback = [0.3, 0.3, 0.3]) {
 
 const ZERO_VECTOR3 = [0, 0, 0];
 const IDENTITY_QUATERNION = [0, 0, 0, 1];
+const ANCHOR_MARGIN = 0.01;
+
+function clampAnchorToExtents(anchor, halfExtents, margin = ANCHOR_MARGIN) {
+  if (!Array.isArray(anchor) || anchor.length !== 3) {
+    return anchor;
+  }
+  const safeExtents = Array.isArray(halfExtents)
+    ? halfExtents
+    : [0.1, 0.1, 0.1];
+  return anchor.map((component, index) => {
+    const value = Number(component);
+    const extent = Math.abs(Number(safeExtents[index])) || 0;
+    if (!Number.isFinite(value) || extent === 0) {
+      return 0;
+    }
+    const limit = Math.max(extent - margin, extent * 0.5, 0);
+    if (limit === 0) {
+      return 0;
+    }
+    if (value > limit) {
+      return limit;
+    }
+    if (value < -limit) {
+      return -limit;
+    }
+    return value;
+  });
+}
 
 function normalizeQuaternion(quaternion, fallback = IDENTITY_QUATERNION) {
   if (!Array.isArray(quaternion) || quaternion.length !== 4) {
@@ -352,14 +380,29 @@ function mutateResizeBody(genome, rng) {
     return false;
   }
   const factor = rng.range(0.75, 1.2);
-  body.halfExtents = body.halfExtents.map((extent) =>
+  const newHalfExtents = body.halfExtents.map((extent) =>
     Math.max(0.1, Math.abs(Number(extent) || 0.3) * factor)
   );
+  body.halfExtents = newHalfExtents;
   if (Array.isArray(body.pose?.position)) {
     body.pose.position = body.pose.position.map((value) =>
       Number.isFinite(Number(value)) ? Number(value) * factor : 0
     );
   }
+  if (Array.isArray(body.joint?.childAnchor)) {
+    body.joint.childAnchor = clampAnchorToExtents(body.joint.childAnchor, newHalfExtents);
+  }
+  bodies.forEach((candidate) => {
+    if (candidate?.joint?.parentId !== body.id) {
+      return;
+    }
+    if (Array.isArray(candidate.joint.parentAnchor)) {
+      candidate.joint.parentAnchor = clampAnchorToExtents(
+        candidate.joint.parentAnchor,
+        newHalfExtents
+      );
+    }
+  });
   return true;
 }
 
