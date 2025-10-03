@@ -146,8 +146,21 @@ self.addEventListener('message', async (event) => {
           sampleInterval: simulation?.sampleInterval,
           signal: controller.signal,
           stageId: simulation?.stageId ?? DEFAULT_STAGE_ID,
-          shouldAbort: checkAbort
+          shouldAbort: checkAbort,
+          maxRootAcceleration: simulation?.maxRootAcceleration,
+          maxRootHeight: simulation?.maxRootHeight
         });
+        if (simulationResult.disqualification) {
+          return {
+            fitness: 0,
+            metrics: null,
+            extras: {
+              trace: simulationResult.trace,
+              runtime: simulationResult.runtime,
+              disqualification: simulationResult.disqualification
+            }
+          };
+        }
         const metrics = computeLocomotionFitness(simulationResult.trace);
         const fitnessScore = scoreLocomotionWithWeights(metrics, weights);
         return {

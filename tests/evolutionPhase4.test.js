@@ -70,6 +70,42 @@ describe('simulateLocomotion', () => {
     expect(result.runtime).toBeGreaterThan(0);
   });
 
+  it('disqualifies runs that exceed the configured root height limit', async () => {
+    const morph = createDefaultMorphGenome();
+    const controller = createDefaultControllerGenome();
+
+    const result = await simulateLocomotion({
+      morphGenome: morph,
+      controllerGenome: controller,
+      duration: 0.5,
+      sampleInterval: 1 / 60,
+      maxRootHeight: 0.25
+    });
+
+    expect(result.disqualification).toEqual(
+      expect.objectContaining({ reason: 'height' })
+    );
+    expect(result.runtime).toBeLessThan(0.5);
+  });
+
+  it('disqualifies runs that exceed the configured root acceleration limit', async () => {
+    const morph = createDefaultMorphGenome();
+    const controller = createDefaultControllerGenome();
+
+    const result = await simulateLocomotion({
+      morphGenome: morph,
+      controllerGenome: controller,
+      duration: 0.5,
+      sampleInterval: 1 / 60,
+      maxRootAcceleration: 2,
+      maxRootHeight: 10
+    });
+
+    expect(result.disqualification).toEqual(
+      expect.objectContaining({ reason: 'acceleration' })
+    );
+  });
+
   it('honors an explicit abort callback during simulation', async () => {
     const morph = createDefaultMorphGenome();
     const controller = createDefaultControllerGenome();

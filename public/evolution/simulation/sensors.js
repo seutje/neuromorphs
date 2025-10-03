@@ -74,6 +74,9 @@ export function gatherSensorSnapshot(instance) {
       rootHeight: rootSnapshot?.height ?? 0,
       rootVelocityY: rootSnapshot?.velocity?.y ?? 0,
       rootSpeed: rootSnapshot?.speed ?? 0,
+      rootVelocity: rootSnapshot?.velocity
+        ? { ...rootSnapshot.velocity }
+        : { x: 0, y: 0, z: 0 },
       footContact: footCandidate?.contact ?? false,
       primaryJointAngle: joints[0]?.angle ?? 0,
       primaryJointVelocity: joints[0]?.velocity ?? 0,
