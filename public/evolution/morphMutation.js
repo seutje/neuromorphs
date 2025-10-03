@@ -59,6 +59,16 @@ function normalizeHalfExtents(extents, fallback = [0.3, 0.3, 0.3]) {
 const ZERO_VECTOR3 = [0, 0, 0];
 const IDENTITY_QUATERNION = [0, 0, 0, 1];
 
+function scaleVector3(vector, factor) {
+  if (!Array.isArray(vector)) {
+    return null;
+  }
+  return vector.map((component) => {
+    const value = Number(component);
+    return Number.isFinite(value) ? value * factor : 0;
+  });
+}
+
 function normalizeQuaternion(quaternion, fallback = IDENTITY_QUATERNION) {
   if (!Array.isArray(quaternion) || quaternion.length !== 4) {
     return [...fallback];
@@ -356,10 +366,35 @@ function mutateResizeBody(genome, rng) {
     Math.max(0.1, Math.abs(Number(extent) || 0.3) * factor)
   );
   if (Array.isArray(body.pose?.position)) {
-    body.pose.position = body.pose.position.map((value) =>
-      Number.isFinite(Number(value)) ? Number(value) * factor : 0
-    );
+    const scaledPosition = scaleVector3(body.pose.position, factor);
+    if (scaledPosition) {
+      body.pose.position = scaledPosition;
+    }
   }
+  if (Array.isArray(body.joint?.childAnchor)) {
+    const scaledChildAnchor = scaleVector3(body.joint.childAnchor, factor);
+    if (scaledChildAnchor) {
+      body.joint.childAnchor = scaledChildAnchor;
+    }
+  }
+
+  bodies.forEach((candidate) => {
+    if (!candidate || candidate.joint?.parentId !== body.id) {
+      return;
+    }
+    if (Array.isArray(candidate.joint.parentAnchor)) {
+      const scaledParentAnchor = scaleVector3(candidate.joint.parentAnchor, factor);
+      if (scaledParentAnchor) {
+        candidate.joint.parentAnchor = scaledParentAnchor;
+      }
+    }
+    if (Array.isArray(candidate.pose?.position)) {
+      const scaledChildPose = scaleVector3(candidate.pose.position, factor);
+      if (scaledChildPose) {
+        candidate.pose.position = scaledChildPose;
+      }
+    }
+  });
   return true;
 }
 
