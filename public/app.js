@@ -64,6 +64,9 @@ const HOOMAN_MODEL_NAME = 'hooman';
 const QUAD_MODEL_URL = new URL('../models/quad.json', import.meta.url);
 const QUAD_MODEL_ID = 'df9d6c08-6b1a-4fa5-9d16-f6a74b8c4f8f';
 const QUAD_MODEL_NAME = 'quad';
+const SNAKE_MODEL_URL = new URL('../models/snake.json', import.meta.url);
+const SNAKE_MODEL_ID = 'f2a5d83c-8dde-4a42-9b3d-6f58ea0380a0';
+const SNAKE_MODEL_NAME = 'snake';
 
 const DOM_UPDATE_INTERVAL_MS = 200;
 let statusTextCache = statusMessage?.textContent ?? '';
@@ -368,6 +371,11 @@ async function seedAdditionalPrefabs() {
       id: QUAD_MODEL_ID,
       name: QUAD_MODEL_NAME,
       url: QUAD_MODEL_URL
+    },
+    {
+      id: SNAKE_MODEL_ID,
+      name: SNAKE_MODEL_NAME,
+      url: SNAKE_MODEL_URL
     }
   ];
   let changed = false;

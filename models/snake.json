@@ -1,0 +1,379 @@
+{
+  "id": "f2a5d83c-8dde-4a42-9b3d-6f58ea0380a0",
+  "name": "snake",
+  "createdAt": 1759462000000,
+  "updatedAt": 1759462000000,
+  "config": {
+    "seed": 1337,
+    "populationSize": 12,
+    "generations": 12,
+    "selectionWeights": {
+      "distance": 0.7,
+      "speed": 1,
+      "upright": 0.5
+    },
+    "morphMutation": {
+      "addLimbChance": 0.18,
+      "resizeChance": 0.78,
+      "jointJitterChance": 0.62
+    },
+    "controllerMutation": {
+      "weightJitterChance": 0.82,
+      "oscillatorChance": 0.7,
+      "addConnectionChance": 0.38
+    },
+    "stageId": "dash"
+  },
+  "individual": {
+    "id": "prefab-04-snake-01",
+    "morph": {
+      "version": "0.1.0",
+      "metadata": {
+        "name": "Snake Prefab",
+        "description": "Segmented serpentine prefab with linked oscillators for lateral undulation.",
+        "tags": [
+          "demo",
+          "prefab",
+          "snake"
+        ]
+      },
+      "materials": {
+        "head": {
+          "color": "#22d3ee",
+          "density": 1.02,
+          "roughness": 0.3,
+          "metalness": 0.12,
+          "friction": 0.92,
+          "restitution": 0.16
+        },
+        "segment": {
+          "color": "#0ea5e9",
+          "density": 0.96,
+          "roughness": 0.38,
+          "metalness": 0.08,
+          "friction": 0.94,
+          "restitution": 0.2
+        }
+      },
+      "bodies": [
+        {
+          "id": "head",
+          "shape": "cuboid",
+          "halfExtents": [
+            0.2,
+            0.12,
+            0.12
+          ],
+          "density": 1.02,
+          "material": "head",
+          "pose": {
+            "position": [
+              0,
+              0.88,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          }
+        },
+        {
+          "id": "body-a",
+          "shape": "cuboid",
+          "halfExtents": [
+            0.36,
+            0.09,
+            0.09
+          ],
+          "density": 0.96,
+          "material": "segment",
+          "pose": {
+            "position": [
+              0.46,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "joint": {
+            "parentId": "head",
+            "type": "revolute",
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "parentAnchor": [
+              0.2,
+              0,
+              0
+            ],
+            "childAnchor": [
+              -0.36,
+              0,
+              0
+            ],
+            "limits": [
+              -1.1,
+              1.1
+            ]
+          }
+        },
+        {
+          "id": "body-b",
+          "shape": "cuboid",
+          "halfExtents": [
+            0.38,
+            0.09,
+            0.09
+          ],
+          "density": 0.96,
+          "material": "segment",
+          "pose": {
+            "position": [
+              0.52,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "joint": {
+            "parentId": "body-a",
+            "type": "revolute",
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "parentAnchor": [
+              0.36,
+              0,
+              0
+            ],
+            "childAnchor": [
+              -0.38,
+              0,
+              0
+            ],
+            "limits": [
+              -1.2,
+              1.2
+            ]
+          }
+        },
+        {
+          "id": "body-c",
+          "shape": "cuboid",
+          "halfExtents": [
+            0.4,
+            0.09,
+            0.09
+          ],
+          "density": 0.96,
+          "material": "segment",
+          "pose": {
+            "position": [
+              0.56,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          "joint": {
+            "parentId": "body-b",
+            "type": "revolute",
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "parentAnchor": [
+              0.38,
+              0,
+              0
+            ],
+            "childAnchor": [
+              -0.4,
+              0,
+              0
+            ],
+            "limits": [
+              -1.25,
+              1.25
+            ]
+          }
+        }
+      ]
+    },
+    "controller": {
+      "version": "0.1.0",
+      "metadata": {
+        "description": "Tri-phase oscillators drive lateral bending across three body joints."
+      },
+      "nodes": [
+        {
+          "id": "bias",
+          "type": "constant",
+          "value": 1
+        },
+        {
+          "id": "osc-head",
+          "type": "oscillator",
+          "amplitude": 0.62,
+          "frequency": 1.05,
+          "frequencyGain": 0.28,
+          "bias": 0,
+          "offset": 0,
+          "phaseOffset": 0
+        },
+        {
+          "id": "osc-mid",
+          "type": "oscillator",
+          "amplitude": 0.62,
+          "frequency": 1.05,
+          "frequencyGain": 0.28,
+          "bias": 0,
+          "offset": 0,
+          "phaseOffset": 1.9
+        },
+        {
+          "id": "osc-tail",
+          "type": "oscillator",
+          "amplitude": 0.62,
+          "frequency": 1.05,
+          "frequencyGain": 0.28,
+          "bias": 0,
+          "offset": 0,
+          "phaseOffset": 3.8
+        },
+        {
+          "id": "neck-motor",
+          "type": "actuator",
+          "activation": "tanh",
+          "gain": 8,
+          "clamp": 1,
+          "bias": 0,
+          "offset": 0,
+          "target": {
+            "type": "joint",
+            "id": "head__body-a",
+            "channel": "torque"
+          }
+        },
+        {
+          "id": "mid-motor",
+          "type": "actuator",
+          "activation": "tanh",
+          "gain": 8,
+          "clamp": 1,
+          "bias": 0,
+          "offset": 0,
+          "target": {
+            "type": "joint",
+            "id": "body-a__body-b",
+            "channel": "torque"
+          }
+        },
+        {
+          "id": "tail-motor",
+          "type": "actuator",
+          "activation": "tanh",
+          "gain": 8,
+          "clamp": 1,
+          "bias": 0,
+          "offset": 0,
+          "target": {
+            "type": "joint",
+            "id": "body-b__body-c",
+            "channel": "torque"
+          }
+        }
+      ],
+      "connections": [
+        {
+          "id": "c-bias-osc-head",
+          "source": "bias",
+          "target": "osc-head",
+          "weight": 0.24
+        },
+        {
+          "id": "c-bias-osc-mid",
+          "source": "bias",
+          "target": "osc-mid",
+          "weight": 0.24
+        },
+        {
+          "id": "c-bias-osc-tail",
+          "source": "bias",
+          "target": "osc-tail",
+          "weight": 0.24
+        },
+        {
+          "id": "c-osc-head-neck",
+          "source": "osc-head",
+          "target": "neck-motor",
+          "weight": 1
+        },
+        {
+          "id": "c-osc-mid-mid",
+          "source": "osc-mid",
+          "target": "mid-motor",
+          "weight": 1
+        },
+        {
+          "id": "c-osc-tail-tail",
+          "source": "osc-tail",
+          "target": "tail-motor",
+          "weight": 1
+        },
+        {
+          "id": "c-bias-neck",
+          "source": "bias",
+          "target": "neck-motor",
+          "weight": 0.08
+        },
+        {
+          "id": "c-bias-mid",
+          "source": "bias",
+          "target": "mid-motor",
+          "weight": 0.08
+        },
+        {
+          "id": "c-bias-tail",
+          "source": "bias",
+          "target": "tail-motor",
+          "weight": 0.08
+        }
+      ]
+    }
+  },
+  "lineage": {
+    "parentId": "prefab-library",
+    "operations": {
+      "morph": [
+        "seed"
+      ],
+      "controller": [
+        "seed"
+      ]
+    }
+  }
+}
