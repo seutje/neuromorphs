@@ -143,7 +143,7 @@ function cloneControllerBlueprintForInstance(blueprint, prefix) {
   return clone;
 }
 
-function collectControllerActuatorIds() {
+function _collectControllerActuatorIds() {
   const ids = new Set();
   controllerInstances.forEach((instance, key) => {
     const runtime = instance?.runtime;
@@ -648,6 +648,9 @@ function gatherSensorSnapshot() {
     rootHeight: root?.height ?? 0,
     rootVelocityY: root?.velocity?.y ?? 0,
     rootSpeed: root?.speed ?? 0,
+    rootVelocity: root?.velocity
+      ? { ...root.velocity }
+      : { x: 0, y: 0, z: 0 },
     footContact: footCandidate?.contact ?? false,
     primaryJointAngle: joints[0]?.angle ?? 0,
     primaryJointVelocity: joints[0]?.velocity ?? 0,
