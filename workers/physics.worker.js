@@ -142,27 +142,6 @@ function cloneControllerBlueprintForInstance(blueprint, prefix) {
   return clone;
 }
 
-function collectControllerActuatorIds() {
-  const ids = new Set();
-  controllerInstances.forEach((instance, key) => {
-    const runtime = instance?.runtime;
-    if (!runtime || !Array.isArray(runtime.actuators)) {
-      return;
-    }
-    runtime.actuators.forEach((actuatorId) => {
-      if (typeof actuatorId !== 'string') {
-        return;
-      }
-      if (instance.prefix) {
-        ids.add(`${key}:${actuatorId}`);
-      } else {
-        ids.add(actuatorId);
-      }
-    });
-  });
-  return Array.from(ids);
-}
-
 function clearCreature() {
   if (!world) {
     return;

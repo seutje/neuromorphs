@@ -108,6 +108,51 @@ describe('morph genome mutations', () => {
     expect(genome).not.toBe(base);
     expect(JSON.stringify(genome)).not.toEqual(JSON.stringify(base));
   });
+
+  it('keeps joint anchors within body extents after repeated resizes', () => {
+    const rng = createRng(512);
+    let current = createDefaultMorphGenome();
+
+    const config = {
+      addLimbChance: 0,
+      resizeChance: 1,
+      jointJitterChance: 0
+    };
+
+    for (let iteration = 0; iteration < 25; iteration += 1) {
+      const { genome } = mutateMorphGenome(current, rng, config);
+      current = genome;
+
+      const bodiesById = new Map();
+      current.bodies.forEach((body) => {
+        if (body?.id) {
+          bodiesById.set(body.id, body);
+        }
+      });
+
+      current.bodies.forEach((body) => {
+        if (!body?.halfExtents) {
+          return;
+        }
+        if (Array.isArray(body.joint?.childAnchor)) {
+          body.joint.childAnchor.forEach((value, index) => {
+            const extent = Math.abs(Number(body.halfExtents?.[index])) || 0;
+            expect(Math.abs(Number(value) || 0)).toBeLessThanOrEqual(extent + 1e-6);
+          });
+        }
+        const parentId = body.joint?.parentId;
+        if (typeof parentId === 'string') {
+          const parent = bodiesById.get(parentId);
+          if (parent && Array.isArray(body.joint?.parentAnchor)) {
+            body.joint.parentAnchor.forEach((value, index) => {
+              const extent = Math.abs(Number(parent.halfExtents?.[index])) || 0;
+              expect(Math.abs(Number(value) || 0)).toBeLessThanOrEqual(extent + 1e-6);
+            });
+          }
+        }
+      });
+    }
+  });
 });
 
 describe('controller genome mutations', () => {
