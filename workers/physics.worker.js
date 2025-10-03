@@ -17,6 +17,7 @@ import {
 } from '../public/environment/arena.js';
 import { MAX_JOINT_ANGULAR_DELTA } from '../public/physics/constants.js';
 import { DEFAULT_STAGE_ID, getStageDefinition } from '../public/environment/stages.js';
+import { applyGroundClearance } from '../public/evolution/simulation/grounding.js';
 
 function createInteractionGroup(membership, filter) {
   const membershipMask = membership & 0xffff;
@@ -417,6 +418,8 @@ function instantiateCreature(morphGenome, controllerGenome, options = {}) {
       material: { ...body.material }
     };
   });
+
+  applyGroundClearance(descriptors);
 
   descriptors.forEach((descriptor) => {
     const bodyDesc = RAPIER.RigidBodyDesc.dynamic()

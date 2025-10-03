@@ -8,6 +8,7 @@ import {
 } from '../../../genomes/ctrlGenome.js';
 import { createControllerRuntime } from '../../../workers/controllerRuntime.js';
 import { COLLISION_GROUP_CREATURE } from './common.js';
+import { applyGroundClearance } from './grounding.js';
 
 export function instantiateCreature(RAPIER, world, morphGenome, controllerGenome) {
   const morph = morphGenome ?? createDefaultMorphGenome();
@@ -19,35 +20,55 @@ export function instantiateCreature(RAPIER, world, morphGenome, controllerGenome
   const bodyOrder = [];
   const bodies = new Map();
 
-  morphBlueprint.bodies.forEach((body) => {
-    const translation = body.translation;
-    const rotation = body.rotation;
+  const descriptors = morphBlueprint.bodies.map((body) => ({
+    id: body.id,
+    translation: [...body.translation],
+    rotation: [...body.rotation],
+    halfExtents: [...body.halfExtents],
+    density: body.density,
+    material: body.material,
+    linearDamping: body.linearDamping,
+    angularDamping: body.angularDamping
+  }));
+
+  applyGroundClearance(descriptors);
+
+  descriptors.forEach((descriptor) => {
     const rigidBody = world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
-        .setTranslation(translation[0], translation[1], translation[2])
-        .setRotation({ x: rotation[0], y: rotation[1], z: rotation[2], w: rotation[3] })
-        .setLinearDamping(body.linearDamping ?? 0.05)
-        .setAngularDamping(body.angularDamping ?? 0.08)
+        .setTranslation(
+          descriptor.translation[0],
+          descriptor.translation[1],
+          descriptor.translation[2]
+        )
+        .setRotation({
+          x: descriptor.rotation[0],
+          y: descriptor.rotation[1],
+          z: descriptor.rotation[2],
+          w: descriptor.rotation[3]
+        })
+        .setLinearDamping(descriptor.linearDamping ?? 0.05)
+        .setAngularDamping(descriptor.angularDamping ?? 0.08)
     );
     const collider = world.createCollider(
       RAPIER.ColliderDesc.cuboid(
-        body.halfExtents[0],
-        body.halfExtents[1],
-        body.halfExtents[2]
+        descriptor.halfExtents[0],
+        descriptor.halfExtents[1],
+        descriptor.halfExtents[2]
       )
-        .setDensity(body.density ?? 1)
-        .setFriction(body.material?.friction ?? 0.9)
-        .setRestitution(body.material?.restitution ?? 0.2)
+        .setDensity(descriptor.density ?? 1)
+        .setFriction(descriptor.material?.friction ?? 0.9)
+        .setRestitution(descriptor.material?.restitution ?? 0.2)
         .setCollisionGroups(COLLISION_GROUP_CREATURE),
       rigidBody
     );
 
-    bodies.set(body.id, {
+    bodies.set(descriptor.id, {
       body: rigidBody,
       collider,
-      halfExtents: [...body.halfExtents]
+      halfExtents: [...descriptor.halfExtents]
     });
-    bodyOrder.push(body.id);
+    bodyOrder.push(descriptor.id);
   });
 
   const jointDescriptors = [];
