@@ -74,6 +74,30 @@ function normalizeQuaternion(quaternion, fallback = IDENTITY_QUATERNION) {
   return values.map((component) => component / length);
 }
 
+function scaleVector3(vector, factor) {
+  if (!Array.isArray(vector) || vector.length !== 3) {
+    return null;
+  }
+  return vector.map((component) => {
+    const value = Number(component);
+    return Number.isFinite(value) ? value * factor : 0;
+  });
+}
+
+function clampAnchorToExtents(anchor, halfExtents) {
+  if (!Array.isArray(anchor) || anchor.length !== 3) {
+    return anchor;
+  }
+  return anchor.map((component, index) => {
+    const value = Number(component);
+    const extent = Math.abs(Number(halfExtents?.[index])) || 0.1;
+    if (!Number.isFinite(value)) {
+      return 0;
+    }
+    return clamp(value, -extent, extent);
+  });
+}
+
 function addVectors(a, b) {
   return [
     (Number(a[0]) || 0) + (Number(b[0]) || 0),
@@ -352,13 +376,43 @@ function mutateResizeBody(genome, rng) {
     return false;
   }
   const factor = rng.range(0.75, 1.2);
-  body.halfExtents = body.halfExtents.map((extent) =>
+  const newHalfExtents = body.halfExtents.map((extent) =>
     Math.max(0.1, Math.abs(Number(extent) || 0.3) * factor)
   );
+  body.halfExtents = newHalfExtents;
   if (Array.isArray(body.pose?.position)) {
-    body.pose.position = body.pose.position.map((value) =>
-      Number.isFinite(Number(value)) ? Number(value) * factor : 0
+    const scaledPosition = scaleVector3(body.pose.position, factor);
+    if (scaledPosition) {
+      body.pose.position = scaledPosition;
+    }
+  }
+  if (body.joint && Array.isArray(body.joint.childAnchor)) {
+    const scaledChildAnchor = scaleVector3(body.joint.childAnchor, factor);
+    body.joint.childAnchor = clampAnchorToExtents(
+      scaledChildAnchor ?? body.joint.childAnchor,
+      newHalfExtents
     );
+  }
+  const bodyId = typeof body.id === 'string' ? body.id : null;
+  if (bodyId) {
+    bodies.forEach((other) => {
+      if (!other?.joint || other.joint.parentId !== bodyId) {
+        return;
+      }
+      if (Array.isArray(other.joint.parentAnchor)) {
+        const scaledParentAnchor = scaleVector3(other.joint.parentAnchor, factor);
+        other.joint.parentAnchor = clampAnchorToExtents(
+          scaledParentAnchor ?? other.joint.parentAnchor,
+          newHalfExtents
+        );
+      }
+      if (Array.isArray(other.pose?.position)) {
+        const scaledChildPosition = scaleVector3(other.pose.position, factor);
+        if (scaledChildPosition) {
+          other.pose.position = scaledChildPosition;
+        }
+      }
+    });
   }
   return true;
 }
