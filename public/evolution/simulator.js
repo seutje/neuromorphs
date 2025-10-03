@@ -6,8 +6,8 @@ import { applyControllerCommands } from './simulation/controllerCommands.js';
 import { computeCenterOfMass } from './simulation/centerOfMass.js';
 import { DEFAULT_STAGE_ID } from '../environment/stages.js';
 
-const DEFAULT_ROOT_ACCELERATION_LIMIT = 300;
-const DEFAULT_ROOT_HEIGHT_LIMIT = 5;
+const DEFAULT_ROOT_ACCELERATION_LIMIT = 1000;
+const DEFAULT_ROOT_HEIGHT_LIMIT = 50;
 
 function recordSample(instance, trace, timestamp, sensors) {
   const centerOfMass = computeCenterOfMass(instance);
