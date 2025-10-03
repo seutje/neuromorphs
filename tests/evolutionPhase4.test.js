@@ -3,7 +3,7 @@ import { createDefaultControllerGenome, validateControllerGenome } from '../geno
 import { mutateMorphGenome, mutateControllerGenome } from '../public/evolution/mutation.js';
 import { createRng } from '../public/evolution/rng.js';
 import { computeLocomotionFitness } from '../public/evolution/fitness.js';
-import { OBJECTIVE_POSITION } from '../public/environment/arena.js';
+import { OBJECTIVE_POSITION, horizontalDistanceToObjective } from '../public/environment/arena.js';
 import { runEvolution } from '../public/evolution/evolutionEngine.js';
 import { simulateLocomotion } from '../public/evolution/simulator.js';
 
@@ -199,6 +199,14 @@ describe('computeLocomotionFitness', () => {
     const towardFitness = computeLocomotionFitness(towardObjective);
     const awayFitness = computeLocomotionFitness(awayFromObjective);
 
+    const towardDistances = towardObjective.map((sample) =>
+      horizontalDistanceToObjective(sample.centerOfMass, OBJECTIVE_POSITION)
+    );
+    const towardImprovement = Math.max(
+      towardDistances[0] - Math.min(...towardDistances),
+      0
+    );
+    expect(towardFitness.objectiveReward).toBeCloseTo(towardImprovement * 2, 5);
     expect(towardFitness.displacement).toBeCloseTo(awayFitness.displacement, 5);
     expect(towardFitness.objectiveReward).toBeGreaterThan(awayFitness.objectiveReward);
     expect(towardFitness.fitness).toBeGreaterThan(awayFitness.fitness);

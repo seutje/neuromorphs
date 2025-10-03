@@ -11,6 +11,7 @@ const DEFAULT_OPTIONS = {
   uprightPercentile: 0.6,
   fallHeightRatio: 0.6,
   objectiveWeight: 1,
+  objectiveRewardMultiplier: 2,
   objectivePosition: OBJECTIVE_POSITION
 };
 
@@ -184,7 +185,11 @@ export function computeLocomotionFitness(samples, options = {}) {
     stats.objectiveStartDistance - stats.objectiveBestDistance,
     0
   );
-  const objectiveReward = objectiveImprovement * config.objectiveWeight;
+  const objectiveRewardMultiplier = Number.isFinite(config.objectiveRewardMultiplier)
+    ? Math.max(config.objectiveRewardMultiplier, 0)
+    : 1;
+  const objectiveReward =
+    objectiveImprovement * config.objectiveWeight * objectiveRewardMultiplier;
   return {
     ...stats,
     objectiveReward,
