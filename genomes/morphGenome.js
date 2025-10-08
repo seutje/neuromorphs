@@ -245,6 +245,14 @@ export function validateMorphGenome(genome) {
       } else {
         parentRefs.set(body.id, parentId);
       }
+      if (
+        Object.prototype.hasOwnProperty.call(body.joint, 'contactsEnabled') &&
+        typeof body.joint.contactsEnabled !== 'boolean'
+      ) {
+        errors.push(
+          `Joint on body "${body.id}" must specify contactsEnabled as a boolean when provided.`
+        );
+      }
       const axis = Array.isArray(body.joint.axis) ? body.joint.axis : [];
       if (axis.length !== 3) {
         errors.push(`Joint on body "${body.id}" requires a 3D axis vector.`);
@@ -404,6 +412,10 @@ export function buildMorphologyBlueprint(genome) {
         parentAnchor: toVector3(node.joint.parentAnchor, [0, 0, 0]),
         childAnchor: toVector3(node.joint.childAnchor, [0, 0, 0]),
         axis: toVector3(node.joint.axis, [0, 1, 0]),
+        contactsEnabled:
+          Object.prototype.hasOwnProperty.call(node.joint, 'contactsEnabled')
+            ? node.joint.contactsEnabled !== false
+            : true,
         limits:
           Array.isArray(node.joint.limits) && node.joint.limits.length === 2
             ? node.joint.limits.map((limit) => Number(limit) || 0)
