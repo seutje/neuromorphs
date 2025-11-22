@@ -23,7 +23,7 @@ export const BrainVisualizer: React.FC<BrainVisualizerProps> = ({ genome, active
 
     const draw = (time: number) => {
       ctx.clearRect(0, 0, c.width, c.height);
-      
+
       // Draw connections
       connections.forEach(conn => {
         const source = nodes.find(n => n.id === conn.source);
@@ -38,11 +38,11 @@ export const BrainVisualizer: React.FC<BrainVisualizerProps> = ({ genome, active
         // Pulse effect if active
         const pulse = active ? Math.sin(time * 0.005 + (Math.abs(conn.weight) * 10)) : 0;
         const alpha = Math.min(1, Math.abs(conn.weight) + 0.2 + (pulse * 0.2));
-        
+
         ctx.beginPath();
         ctx.moveTo(sx, sy);
         ctx.lineTo(tx, ty);
-        ctx.strokeStyle = conn.weight > 0 
+        ctx.strokeStyle = conn.weight > 0
           ? `rgba(52, 211, 153, ${alpha})` // Green positive
           : `rgba(244, 63, 94, ${alpha})`; // Red negative
         ctx.lineWidth = Math.abs(conn.weight) * 2;
@@ -53,10 +53,10 @@ export const BrainVisualizer: React.FC<BrainVisualizerProps> = ({ genome, active
       nodes.forEach(node => {
         const x = node.x * c.width;
         const y = node.y * c.height;
-        
+
         ctx.beginPath();
         ctx.arc(x, y, 6, 0, Math.PI * 2);
-        
+
         // Fill based on type
         switch (node.type) {
           case NodeType.SENSOR: ctx.fillStyle = '#3b82f6'; break; // Blue
@@ -65,13 +65,13 @@ export const BrainVisualizer: React.FC<BrainVisualizerProps> = ({ genome, active
           default: ctx.fillStyle = '#94a3b8'; // Grey
         }
         ctx.fill();
-        
+
         // Active border
         if (active) {
-           const activation = Math.sin(time * 0.01 + node.x * 10); // Fake activation
-           ctx.strokeStyle = `rgba(255,255,255,${Math.abs(activation)})`;
-           ctx.lineWidth = 2;
-           ctx.stroke();
+          const activation = Math.sin(time * 0.01 + node.x * 10); // Fake activation
+          ctx.strokeStyle = `rgba(255,255,255,${Math.abs(activation)})`;
+          ctx.lineWidth = 2;
+          ctx.stroke();
         }
 
         // Draw Label
@@ -80,7 +80,7 @@ export const BrainVisualizer: React.FC<BrainVisualizerProps> = ({ genome, active
         ctx.textAlign = 'center';
         ctx.fillText(node.label, x, y + 16); // Position below the node
       });
-      
+
       if (active) {
         animationFrameId = requestAnimationFrame(draw);
       }
@@ -93,8 +93,8 @@ export const BrainVisualizer: React.FC<BrainVisualizerProps> = ({ genome, active
 
   return (
     <div className="relative w-full h-48 bg-slate-900/50 rounded border border-slate-700 overflow-hidden">
-       <div className="absolute top-2 left-2 text-xs text-slate-400 uppercase font-mono pointer-events-none">Controller Graph</div>
-       <canvas ref={canvasRef} width={400} height={192} className="w-full h-full" />
+      <div className="absolute top-2 left-2 text-xs text-slate-400 uppercase font-mono pointer-events-none">Controller Graph</div>
+      <canvas ref={canvasRef} width={400} height={192} className="w-full h-full" />
     </div>
   );
 };
@@ -110,15 +110,16 @@ export const MorphologyVisualizer: React.FC<MorphologyVisualizerProps> = ({ geno
   const creatureRef = useRef<THREE.Group | null>(null);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
 
     // Setup Mini Scene
-    const width = (containerRef.current as any).clientWidth;
-    const height = (containerRef.current as any).clientHeight;
-    
+    const width = (container as any).clientWidth;
+    const height = (container as any).clientHeight;
+
     const scene = new THREE.Scene();
     // Transparent background
-    scene.background = null; 
+    scene.background = null;
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
@@ -127,7 +128,7 @@ export const MorphologyVisualizer: React.FC<MorphologyVisualizerProps> = ({ geno
 
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(width, height);
-    (containerRef.current as any).appendChild(renderer.domElement);
+    (container as any).appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
     // Lighting
@@ -149,20 +150,20 @@ export const MorphologyVisualizer: React.FC<MorphologyVisualizerProps> = ({ geno
     animate();
 
     const handleResize = () => {
-        if (!containerRef.current) return;
-        const w = (containerRef.current as any).clientWidth;
-        const h = (containerRef.current as any).clientHeight;
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-        renderer.setSize(w, h);
+      if (!container) return;
+      const w = (container as any).clientWidth;
+      const h = (container as any).clientHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
     };
     (window as any).addEventListener('resize', handleResize);
 
     return () => {
       cancelAnimationFrame(frameId);
       (window as any).removeEventListener('resize', handleResize);
-      if (rendererRef.current && containerRef.current) {
-         (containerRef.current as any).removeChild(rendererRef.current.domElement);
+      if (rendererRef.current && container) {
+        (container as any).removeChild(rendererRef.current.domElement);
       }
       renderer.dispose();
     };
@@ -184,10 +185,10 @@ export const MorphologyVisualizer: React.FC<MorphologyVisualizerProps> = ({ geno
 
     // 1. Meshes
     genome.morphology.forEach(block => {
-       const geometry = new THREE.BoxGeometry(block.size[0], block.size[1], block.size[2]);
-       const material = new THREE.MeshStandardMaterial({ color: block.color, roughness: 0.3 });
-       const mesh = new THREE.Mesh(geometry, material);
-       parts.set(block.id, { mesh, block });
+      const geometry = new THREE.BoxGeometry(block.size[0], block.size[1], block.size[2]);
+      const material = new THREE.MeshStandardMaterial({ color: block.color, roughness: 0.3 });
+      const mesh = new THREE.Mesh(geometry, material);
+      parts.set(block.id, { mesh, block });
     });
 
     // 2. Assemble Hierarchy with Pivots
@@ -195,9 +196,9 @@ export const MorphologyVisualizer: React.FC<MorphologyVisualizerProps> = ({ geno
     const parentToChildren = new Map<number, BlockNode[]>();
     genome.morphology.forEach(b => {
       if (b.parentId !== undefined) {
-         const list = parentToChildren.get(b.parentId) || [];
-         list.push(b);
-         parentToChildren.set(b.parentId, list);
+        const list = parentToChildren.get(b.parentId) || [];
+        list.push(b);
+        parentToChildren.set(b.parentId, list);
       }
     });
 
@@ -211,74 +212,74 @@ export const MorphologyVisualizer: React.FC<MorphologyVisualizerProps> = ({ geno
       } else {
         const parentPart = parts.get(currentBlock.parentId);
         if (parentPart) {
-           const { mesh: parentMesh, block: parentBlock } = parentPart;
-           
-           // Determine slotting using attachFace and sibling overlap
-           const siblings = parentToChildren.get(currentBlock.parentId) || [];
-           const faceGroup = siblings.filter(s => s.attachFace === currentBlock.attachFace);
-           const indexInFace = faceGroup.findIndex(s => s.id === currentBlock.id);
-           const countInFace = faceGroup.length;
-           
-           const face = currentBlock.attachFace;
-           const axisIdx = Math.floor(face / 2);
-           const dir = face % 2 === 0 ? 1 : -1;
+          const { mesh: parentMesh, block: parentBlock } = parentPart;
 
-           // Spread Logic
-           let spreadOffset = 0;
-           let spreadAxis = 0;
-           
-           // Select spread axis based on face normal
-           if (axisIdx === 0) spreadAxis = 2; // Face X -> Spread Z
-           else if (axisIdx === 1) spreadAxis = 0; // Face Y -> Spread X
-           else spreadAxis = 0; // Face Z -> Spread X
+          // Determine slotting using attachFace and sibling overlap
+          const siblings = parentToChildren.get(currentBlock.parentId) || [];
+          const faceGroup = siblings.filter(s => s.attachFace === currentBlock.attachFace);
+          const indexInFace = faceGroup.findIndex(s => s.id === currentBlock.id);
+          const countInFace = faceGroup.length;
 
-           if (countInFace > 1) {
-               const parentDim = parentBlock.size[spreadAxis];
-               const available = parentDim * 0.8;
-               const t = indexInFace / (countInFace - 1); 
-               spreadOffset = (t - 0.5) * available;
-           }
+          const face = currentBlock.attachFace;
+          const axisIdx = Math.floor(face / 2);
+          const dir = face % 2 === 0 ? 1 : -1;
 
-           // Create Pivot Group
-           const pivot = new THREE.Group();
-           
-           // Position Pivot on Parent Surface + Spread
-           const parentHalf = parentBlock.size[axisIdx] / 2;
-           const pivotPos = parentHalf * dir;
-           
-           if (axisIdx === 0) pivot.position.x = pivotPos;
-           if (axisIdx === 1) pivot.position.y = pivotPos;
-           if (axisIdx === 2) pivot.position.z = pivotPos;
+          // Spread Logic
+          let spreadOffset = 0;
+          let spreadAxis = 0;
 
-           // Apply Spread
-           if (spreadAxis === 0) pivot.position.x += spreadOffset;
-           if (spreadAxis === 1) pivot.position.y += spreadOffset;
-           if (spreadAxis === 2) pivot.position.z += spreadOffset;
+          // Select spread axis based on face normal
+          if (axisIdx === 0) spreadAxis = 2; // Face X -> Spread Z
+          else if (axisIdx === 1) spreadAxis = 0; // Face Y -> Spread X
+          else spreadAxis = 0; // Face Z -> Spread X
 
-           parentMesh.add(pivot);
+          if (countInFace > 1) {
+            const parentDim = parentBlock.size[spreadAxis];
+            const available = parentDim * 0.8;
+            const t = indexInFace / (countInFace - 1);
+            spreadOffset = (t - 0.5) * available;
+          }
 
-           // Position Child relative to Pivot (extending out)
-           const childHalf = currentBlock.size[axisIdx] / 2;
-           const childPos = childHalf * dir;
-           if (axisIdx === 0) mesh.position.x = childPos;
-           if (axisIdx === 1) mesh.position.y = childPos;
-           if (axisIdx === 2) mesh.position.z = childPos;
+          // Create Pivot Group
+          const pivot = new THREE.Group();
 
-           pivot.add(mesh);
+          // Position Pivot on Parent Surface + Spread
+          const parentHalf = parentBlock.size[axisIdx] / 2;
+          const pivotPos = parentHalf * dir;
 
-           // Joint Visual
-           const jointMesh = new THREE.Mesh(
-              new THREE.SphereGeometry(Math.min(0.1, Math.min(...currentBlock.size)/2)), 
-              new THREE.MeshStandardMaterial({ color: 0x555555 })
-           );
-           pivot.add(jointMesh);
+          if (axisIdx === 0) pivot.position.x = pivotPos;
+          if (axisIdx === 1) pivot.position.y = pivotPos;
+          if (axisIdx === 2) pivot.position.z = pivotPos;
+
+          // Apply Spread
+          if (spreadAxis === 0) pivot.position.x += spreadOffset;
+          if (spreadAxis === 1) pivot.position.y += spreadOffset;
+          if (spreadAxis === 2) pivot.position.z += spreadOffset;
+
+          parentMesh.add(pivot);
+
+          // Position Child relative to Pivot (extending out)
+          const childHalf = currentBlock.size[axisIdx] / 2;
+          const childPos = childHalf * dir;
+          if (axisIdx === 0) mesh.position.x = childPos;
+          if (axisIdx === 1) mesh.position.y = childPos;
+          if (axisIdx === 2) mesh.position.z = childPos;
+
+          pivot.add(mesh);
+
+          // Joint Visual
+          const jointMesh = new THREE.Mesh(
+            new THREE.SphereGeometry(Math.min(0.1, Math.min(...currentBlock.size) / 2)),
+            new THREE.MeshStandardMaterial({ color: 0x555555 })
+          );
+          pivot.add(jointMesh);
         }
       }
     });
 
     // Center it
     new THREE.Box3().setFromObject(group).getCenter(group.position).multiplyScalar(-1);
-    
+
     scene.add(group);
     creatureRef.current = group;
 
