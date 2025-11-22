@@ -1,449 +1,50 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Neuromorphs Playground</title>
-    <link rel="stylesheet" href="./style.css" />
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
-        }
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NeuroMorphs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* Custom Scrollbar for a 'Scientific' feel */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
       }
-    </script>
-  </head>
+      ::-webkit-scrollbar-track {
+        background: #0f172a; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #334155; 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #475569; 
+      }
+      body {
+        background-color: #020617;
+        color: #e2e8f0;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "recharts": "https://aistudiocdn.com/recharts@^3.4.1",
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+    "three/": "https://aistudiocdn.com/three@^0.181.1/",
+    "@dimforge/rapier3d-compat": "https://unpkg.com/@dimforge/rapier3d-compat@0.11.2/rapier.es.js"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
   <body>
-    <header class="site-header">
-      <h1>Neuromorphs Playground</h1>
-      <p class="tagline">Procedural creatures evolved in your browser.</p>
-    </header>
-    <main class="content">
-      <section class="viewport-panel">
-        <div class="viewer-toolbar" role="group" aria-label="Viewport controls">
-          <div class="viewer-controls">
-            <label class="control-label" for="view-mode">View</label>
-            <select id="view-mode" class="view-select">
-              <option value="orbit">Orbit</option>
-              <option value="follow">Follow</option>
-            </select>
-            <label class="control-label" for="stage-select">Stage</label>
-            <select id="stage-select" class="view-select stage-select">
-              <option value="dash">Dash</option>
-              <option value="obstacle">Obstacle</option>
-            </select>
-            <button id="load-stage" type="button">Load Stage</button>
-            <button id="clear-stage" type="button">Clear Stage</button>
-            <button id="simulation-toggle" type="button" aria-pressed="false">
-              Pause Simulation
-            </button>
-          </div>
-          <p class="status" id="status-message">Loading WebGL and physics modules…</p>
-        </div>
-        <canvas id="viewport" aria-label="Creature viewport" role="img"></canvas>
-      </section>
-      <section class="sidebar-panel evolution-panel">
-        <header class="evolution-panel__intro">
-          <div class="evolution-panel__title-row">
-            <h2>Evolution Run</h2>
-            <button id="reset-all" type="button">Reset All</button>
-          </div>
-          <p class="panel-description">
-            Tune parameters and launch a deterministic evolution sweep. Progress updates live while
-            the synthetic evaluation trace is generated.
-          </p>
-        </header>
-        <form id="evolution-config" class="config-form">
-          <div class="config-column">
-            <fieldset>
-              <legend>Population</legend>
-              <label for="config-seed">Seed</label>
-              <input id="config-seed" name="seed" type="number" min="0" value="42" />
-              <label for="config-population">Population Size</label>
-              <input
-                id="config-population"
-                name="populationSize"
-                type="number"
-                min="4"
-                max="128"
-                value="12"
-              />
-              <label for="config-generations">Generations</label>
-              <input
-                id="config-generations"
-                name="generations"
-                type="number"
-                min="1"
-                max="100"
-                value="10"
-              />
-            </fieldset>
-          </div>
-          <div class="config-column">
-            <fieldset>
-              <legend>Morph Mutation</legend>
-              <label id="label-morph-add" for="config-morph-add">Add Limb Chance</label>
-              <div class="mutation-slider">
-                <input
-                  id="config-morph-add-slider"
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value="0.35"
-                  data-sync-target="morphAddLimbChance"
-                  aria-labelledby="label-morph-add"
-                />
-                <input
-                  id="config-morph-add"
-                  name="morphAddLimbChance"
-                  type="text"
-                  value="0.35"
-                  data-sync-source="morphAddLimbChance"
-                  inputmode="decimal"
-                  autocomplete="off"
-                  spellcheck="false"
-                />
-              </div>
-              <label id="label-morph-resize" for="config-morph-resize">Resize Chance</label>
-              <div class="mutation-slider">
-                <input
-                  id="config-morph-resize-slider"
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value="0.85"
-                  data-sync-target="morphResizeChance"
-                  aria-labelledby="label-morph-resize"
-                />
-                <input
-                  id="config-morph-resize"
-                  name="morphResizeChance"
-                  type="text"
-                  value="0.85"
-                  data-sync-source="morphResizeChance"
-                  inputmode="decimal"
-                  autocomplete="off"
-                  spellcheck="false"
-                />
-              </div>
-              <label id="label-morph-joint" for="config-morph-joint">Joint Jitter Chance</label>
-              <div class="mutation-slider">
-                <input
-                  id="config-morph-joint-slider"
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value="0.65"
-                  data-sync-target="morphJointJitterChance"
-                  aria-labelledby="label-morph-joint"
-                />
-                <input
-                  id="config-morph-joint"
-                  name="morphJointJitterChance"
-                  type="text"
-                  value="0.65"
-                  data-sync-source="morphJointJitterChance"
-                  inputmode="decimal"
-                  autocomplete="off"
-                  spellcheck="false"
-                />
-              </div>
-            </fieldset>
-          </div>
-          <div class="config-column">
-            <fieldset>
-              <legend>Controller Mutation</legend>
-              <label id="label-ctrl-weight" for="config-ctrl-weight">Weight Jitter Chance</label>
-              <div class="mutation-slider">
-                <input
-                  id="config-ctrl-weight-slider"
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value="0.85"
-                  data-sync-target="controllerWeightChance"
-                  aria-labelledby="label-ctrl-weight"
-                />
-                <input
-                  id="config-ctrl-weight"
-                  name="controllerWeightChance"
-                  type="text"
-                  value="0.85"
-                  data-sync-source="controllerWeightChance"
-                  inputmode="decimal"
-                  autocomplete="off"
-                  spellcheck="false"
-                />
-              </div>
-              <label id="label-ctrl-osc" for="config-ctrl-osc">Oscillator Tune Chance</label>
-              <div class="mutation-slider">
-                <input
-                  id="config-ctrl-osc-slider"
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value="0.6"
-                  data-sync-target="controllerOscillatorChance"
-                  aria-labelledby="label-ctrl-osc"
-                />
-                <input
-                  id="config-ctrl-osc"
-                  name="controllerOscillatorChance"
-                  type="text"
-                  value="0.6"
-                  data-sync-source="controllerOscillatorChance"
-                  inputmode="decimal"
-                  autocomplete="off"
-                  spellcheck="false"
-                />
-              </div>
-              <label id="label-ctrl-conn" for="config-ctrl-conn">Add Connection Chance</label>
-              <div class="mutation-slider">
-                <input
-                  id="config-ctrl-conn-slider"
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value="0.45"
-                  data-sync-target="controllerAddConnectionChance"
-                  aria-labelledby="label-ctrl-conn"
-                />
-                <input
-                  id="config-ctrl-conn"
-                  name="controllerAddConnectionChance"
-                  type="text"
-                  value="0.45"
-                  data-sync-source="controllerAddConnectionChance"
-                  inputmode="decimal"
-                  autocomplete="off"
-                  spellcheck="false"
-                />
-              </div>
-            </fieldset>
-          </div>
-          <div class="config-column">
-            <fieldset class="run-summary">
-              <legend class="run-summary__title">Run Controls &amp; Stats</legend>
-              <div class="run-controls">
-                <button id="evolution-start" type="button">Start Evolution</button>
-                <button id="preview-best" type="button" disabled>Preview Best</button>
-                <div class="run-controls__starting">
-                  <label for="starting-model">Starting model</label>
-                  <select id="starting-model" name="startingModelId">
-                    <option value="">Hopper (default)</option>
-                  </select>
-                </div>
-                <div class="run-controls__weights">
-                  <span class="run-controls__weights-label">Fitness weights</span>
-                  <div class="run-controls__weights-grid">
-                    <div class="run-controls__weight">
-                      <label for="config-weight-distance">Distance</label>
-                      <input
-                        id="config-weight-distance"
-                        name="selectionWeightDistance"
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value="0.5"
-                      />
-                    </div>
-                    <div class="run-controls__weight">
-                      <label for="config-weight-speed">Speed</label>
-                      <input
-                        id="config-weight-speed"
-                        name="selectionWeightSpeed"
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value="1"
-                      />
-                    </div>
-                    <div class="run-controls__weight">
-                      <label for="config-weight-upright">Upright</label>
-                      <input
-                        id="config-weight-upright"
-                        name="selectionWeightUpright"
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value="1"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <progress
-                  id="evolution-progress"
-                  value="0"
-                  max="1"
-                  aria-live="polite"
-                ></progress>
-              </div>
-              <dl id="evolution-stats" class="stats-readout">
-                <div class="stat-row">
-                  <dt>Generation</dt>
-                  <dd id="stat-generation">—</dd>
-                </div>
-                <div class="stat-row">
-                  <dt>Best Fitness</dt>
-                  <dd id="stat-best">—</dd>
-                </div>
-                <div class="stat-row">
-                  <dt>Mean Fitness</dt>
-                  <dd id="stat-mean">—</dd>
-                </div>
-              </dl>
-            </fieldset>
-          </div>
-          <div class="config-column">
-            <fieldset id="model-library" class="model-library" data-model-library>
-              <legend>Saved Models</legend>
-              <label for="model-name">Model name</label>
-              <div class="model-library__save">
-                <input
-                  id="model-name"
-                  name="modelName"
-                  type="text"
-                  placeholder="e.g., Lecture demo"
-                  maxlength="120"
-                  data-model-name
-                />
-                <button id="model-save" type="button" data-model-save disabled>Save Model</button>
-              </div>
-              <p class="model-library__hint">
-                Store the current best individual with a custom label for later preview.
-              </p>
-              <div class="model-library__list">
-                <label class="model-library__label" for="model-list">Saved entries</label>
-                <select
-                  id="model-list"
-                  class="model-library__select"
-                  size="4"
-                  data-model-list
-                  aria-label="Saved models"
-                ></select>
-                <p id="model-empty" class="model-library__empty" role="status" data-model-empty>
-                  No saved models yet.
-                </p>
-              </div>
-              <div class="model-library__actions">
-                <button id="model-add" type="button" data-model-add disabled>Add</button>
-                <button id="model-export" type="button" data-model-export disabled>Export</button>
-                <button
-                  id="model-delete"
-                  type="button"
-                  class="model-library__delete"
-                  data-model-delete
-                  disabled
-                >
-                  Delete
-                </button>
-              </div>
-            </fieldset>
-          </div>
-          <div class="config-column">
-            <fieldset
-              id="generation-viewer"
-              class="generation-viewer is-empty"
-              aria-label="Generation viewer"
-            >
-              <legend class="generation-viewer__legend">Generation Viewer</legend>
-              <div class="generation-viewer__header">
-                <div>
-                  <p class="generation-viewer__subtitle">
-                    Scrub through best-of generation stats or auto-play the evolution timeline.
-                  </p>
-                </div>
-                <div class="generation-viewer__actions">
-                  <button
-                    id="generation-play"
-                    class="generation-viewer__button"
-                    type="button"
-                    disabled
-                  >
-                    Play
-                  </button>
-                  <button
-                    id="generation-latest"
-                    class="generation-viewer__button generation-viewer__button--ghost"
-                    type="button"
-                    disabled
-                  >
-                    Latest
-                  </button>
-                </div>
-              </div>
-              <label for="generation-slider" class="generation-viewer__label">Scrub generations</label>
-              <input
-                id="generation-slider"
-                class="generation-viewer__slider"
-                type="range"
-                min="0"
-                max="0"
-                step="1"
-                value="0"
-                disabled
-              />
-              <div class="generation-summary">
-                <div class="generation-summary__header">
-                  <p class="generation-summary__title">
-                    Generation <span id="generation-summary-generation">—</span>
-                  </p>
-                  <span id="generation-summary-count" class="generation-summary__count">0 / 0</span>
-                </div>
-                <p class="generation-summary__fitness">
-                  Best fitness <span id="generation-summary-best">—</span>
-                </p>
-                <dl class="generation-summary__metrics">
-                  <div>
-                    <dt>Mean fitness</dt>
-                    <dd id="generation-summary-mean">—</dd>
-                  </div>
-                  <div>
-                    <dt>Displacement</dt>
-                    <dd id="generation-summary-displacement">—</dd>
-                  </div>
-                  <div>
-                    <dt>Avg speed</dt>
-                    <dd id="generation-summary-speed">—</dd>
-                  </div>
-                  <div>
-                    <dt>Avg height</dt>
-                    <dd id="generation-summary-height">—</dd>
-                  </div>
-                  <div>
-                    <dt>Upright time</dt>
-                    <dd id="generation-summary-upright">—</dd>
-                  </div>
-                  <div>
-                    <dt>Runtime</dt>
-                    <dd id="generation-summary-runtime">—</dd>
-                  </div>
-                </dl>
-              </div>
-              <ol
-                id="generation-timeline"
-                class="generation-timeline"
-                aria-label="Best fitness per generation"
-              ></ol>
-              <p class="generation-viewer__empty" role="status">
-                Launch an evolution run to populate the timeline.
-              </p>
-            </fieldset>
-          </div>
-        </form>
-      </section>
-    </main>
-    <footer class="site-footer">
-      <small>
-        Thanks to <a href="https://bit.ly/m/jabrils">jabrils</a> for the inspiration!
-      </small>
-    </footer>
-    <script type="module" src="./public/app.js"></script>
-  </body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
 </html>

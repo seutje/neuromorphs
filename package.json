@@ -1,22 +1,25 @@
 {
   "name": "neuromorphs",
-  "version": "0.1.0",
   "private": true,
+  "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "serve": "node scripts/dev-server.mjs",
-    "test": "jest",
-    "lint": "eslint . --ext .js,.mjs"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "lucide-react": "^0.554.0",
+    "recharts": "^3.4.1",
+    "three": "^0.181.1",
+    "@dimforge/rapier3d-compat": "0.11.2"
   },
   "devDependencies": {
-    "@dimforge/rapier3d-compat": "^0.11.2",
-    "@babel/preset-env": "^7.24.7",
-    "@eslint/js": "^9.9.0",
-    "babel-jest": "^29.7.0",
-    "eslint": "^9.8.0",
-    "eslint-config-prettier": "^9.1.0",
-    "globals": "^15.9.0",
-    "jest": "^29.7.0",
-    "jest-environment-jsdom": "^30.2.0"
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
   }
 }

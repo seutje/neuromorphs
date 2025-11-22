@@ -1,0 +1,5 @@
+{
+  "name": "NeuroMorphs",
+  "description": "A modern web reinterpretation of Karl Sims’ Evolved Virtual Creatures. Watch neural networks evolve to control articulated bodies in real-time.",
+  "requestFramePermissions": []
+}
