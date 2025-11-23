@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Pause, FastForward, RefreshCw, Settings, Share2, Trophy, Activity, MousePointer2, PenTool } from 'lucide-react';
 import { Individual, GenerationStats, SimulationConfig } from './types';
-import { generateIndividual, evolvePopulation, setSeed } from './services/genetics';
+import { generateIndividual, evolvePopulation, setSeed, mutateGenome } from './services/genetics';
 import { WorldView } from './components/WorldView';
 import { StatsPanel } from './components/StatsPanel';
 import { BrainVisualizer, MorphologyVisualizer } from './components/Visualizers';
@@ -220,8 +220,12 @@ function App() {
       // We can add slight mutations here if we want diversity, or keep them identical
       const ind = generateIndividual(0, i);
       ind.genome = JSON.parse(JSON.stringify(editedGenome)); // Clone the edited genome
-      // Optionally mutate slightly:
-      // mutate(ind.genome, config.mutationRate); 
+
+      // Keep the first one exact, mutate the rest
+      if (i > 0) {
+        mutateGenome(ind.genome, config.mutationRate);
+      }
+
       initialPop.push(ind);
     }
 

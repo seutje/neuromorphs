@@ -128,7 +128,7 @@ export const generateIndividual = (generation: number, index: number): Individua
 };
 
 // Mutate a genome in place
-const mutateGenome = (genome: Genome, rate: number) => {
+export const mutateGenome = (genome: Genome, rate: number) => {
   const { brain, morphology } = genome;
 
   // Mutate Weights
