@@ -222,7 +222,9 @@ export const WorldView: React.FC<WorldViewProps> = ({
           const mesh = meshes[i];
           // Check visibility
           const inFrustum = frustum.containsPoint(mesh.position);
-          if (mesh.position.y < -50 || !inFrustum) {
+          const distance = cameraRef.current.position.distanceTo(mesh.position);
+
+          if (mesh.position.y < -50 || !inFrustum || distance > 100) {
             mesh.visible = false;
           } else {
             mesh.visible = true;
