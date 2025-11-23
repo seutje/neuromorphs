@@ -21,6 +21,14 @@ const random = () => {
 // Helper for range
 const randomRange = (min: number, max: number) => min + random() * (max - min);
 
+const randomRotation = (): [number, number, number] => {
+  return [
+    randomRange(-20, 20),
+    randomRange(-20, 20),
+    randomRange(-20, 20)
+  ];
+};
+
 const generateRandomMorphology = (nodeCount: number): BlockNode[] => {
   const nodes: BlockNode[] = [];
   for (let i = 0; i < nodeCount; i++) {
@@ -92,7 +100,7 @@ const generateRandomMorphology = (nodeCount: number): BlockNode[] => {
       size: size,
       color: COLORS[i % COLORS.length],
       parentId: parentId,
-      rotation: [0, 0, 0],
+      rotation: parentId !== undefined ? randomRotation() : [0, 0, 0],
       jointType: jointType,
       jointParams: {
         speed: 2 + random() * 4,     // 2 to 6
@@ -320,7 +328,7 @@ export const mutateGenome = (genome: Genome, rate: number) => {
       parentId: parent.id,
       size: size,
       color: COLORS[newId % COLORS.length],
-      rotation: [0, 0, 0],
+      rotation: randomRotation(),
       jointType: random() > 0.5 ? JointType.REVOLUTE : JointType.SPHERICAL,
       jointParams: {
         speed: 2 + random() * 4,
