@@ -12,7 +12,7 @@ import { SettingsPane } from './components/SettingsPane';
 const INITIAL_CONFIG: SimulationConfig = {
   populationSize: 250,
   mutationRate: 0.3,
-  simulationSpeed: 2,
+  simulationSpeed: 10,
   epochDuration: 60, // Seconds
   task: 'LOCOMOTION',
   seed: 42,
@@ -178,7 +178,7 @@ function App() {
   }, [isPlaying, config.simulationSpeed, config.epochDuration, stepGeneration]);
 
   const handleSpeedChange = () => {
-    const speeds = [1, 2, 4, 8];
+    const speeds = [1, 2, 5, 10];
     const idx = speeds.indexOf(config.simulationSpeed);
     setConfig({ ...config, simulationSpeed: speeds[(idx + 1) % speeds.length] });
   };
