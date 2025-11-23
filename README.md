@@ -39,11 +39,15 @@ Each creature is defined by a **Genome** which acts as a blueprint for its body 
 ### 2. Physics Simulation (Phenotype)
 The simulation is powered by **Rapier3D** (via `@dimforge/rapier3d-compat`) and rendered with **Three.js**.
 - **Rigid Body Dynamics**: Each block is a dynamic rigid body with mass, friction, and restitution.
-- **Motor Control**: Joints are driven by motors. Currently, the simulation uses **Oscillator-Based Control**:
-    - Each joint has an internal sine wave controller: $Target = Amplitude \times \sin(Time \times Speed + Phase)$.
-    - The *Speed*, *Phase*, and *Amplitude* are evolved parameters unique to each joint.
-    - This allows for rhythmic, periodic motion (walking, crawling) without complex sensory feedback (yet).
-- **Neural Network (Future)**: The codebase includes a dormant Neural Network generator (`services/genetics.ts`) capable of creating sensor-actuator graphs. This is laid out for future upgrades to sensor-based reactive control.
+- **Neural Network Control**: Joints are driven by a **Recurrent Neural Network (RNN)** evolved alongside the morphology.
+    - **Sensors (Inputs)**:
+        - **Ground Contact**: Detects if the creature is touching the floor.
+        - **Joint Angle**: Proprioception of current joint angles.
+        - **Velocity**: Forward velocity sensing.
+        - **Oscillator**: A central clock signal (`sin(time)`) to enable rhythmic behavior.
+    - **Brain Architecture**: A graph of neurons and synapses with `tanh` activation functions. The network topology (nodes & connections) is evolved.
+    - **Actuators (Outputs)**: Output neurons drive the target angle of each joint.
+    - *Fallback*: If no neural output is present for a joint, it falls back to a simple sine-wave oscillator.
 
 ### 3. Evolutionary Algorithm
 The system uses a standard genetic algorithm to optimize creatures for **Locomotion** (distance traveled).
