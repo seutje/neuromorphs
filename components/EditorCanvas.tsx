@@ -3,14 +3,16 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Genome, BlockNode } from '../types';
 import { useResizeObserver } from '../hooks/useResizeObserver';
+import { PRESETS } from '../config/presets';
 
 interface EditorCanvasProps {
     genome: Genome;
     selectedBlockId: number | null;
     onSelectBlock: (id: number | null) => void;
+    onLoadPreset: (genome: Genome) => void;
 }
 
-export const EditorCanvas: React.FC<EditorCanvasProps> = ({ genome, selectedBlockId, onSelectBlock }) => {
+export const EditorCanvas: React.FC<EditorCanvasProps> = ({ genome, selectedBlockId, onSelectBlock, onLoadPreset }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
     const sceneRef = useRef<THREE.Scene | null>(null);
@@ -233,6 +235,27 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({ genome, selectedBloc
                 <div className="bg-slate-950/50 backdrop-blur text-xs text-slate-400 px-2 py-1 rounded border border-slate-800">
                     Editor Mode
                 </div>
+            </div>
+
+            {/* Presets Dropdown */}
+            <div className="absolute top-4 right-4 z-10">
+                <select
+                    className="bg-slate-950/80 backdrop-blur text-xs text-slate-300 px-3 py-1.5 rounded border border-slate-700 hover:border-slate-500 transition-colors cursor-pointer outline-none focus:ring-1 focus:ring-blue-500"
+                    onChange={(e) => {
+                        const preset = PRESETS.find(p => p.name === e.target.value);
+                        if (preset) {
+                            onLoadPreset(preset.genome);
+                        }
+                        // Reset select to default/placeholder if desired, or keep selected
+                        e.target.value = "";
+                    }}
+                    defaultValue=""
+                >
+                    <option value="" disabled>Load Preset...</option>
+                    {PRESETS.map(p => (
+                        <option key={p.name} value={p.name}>{p.name}</option>
+                    ))}
+                </select>
             </div>
         </div>
     );

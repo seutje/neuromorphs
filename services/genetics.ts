@@ -6,8 +6,8 @@ const COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f43f5e', '#f59e0b', '#06b6d4'
 // --- Seeded RNG (Mulberry32) ---
 let _seed = 42;
 
-export const setSeed = (s: number) => { 
-  _seed = s; 
+export const setSeed = (s: number) => {
+  _seed = s;
 };
 
 // Returns a float between 0 and 1
@@ -25,26 +25,26 @@ const generateRandomMorphology = (nodeCount: number): BlockNode[] => {
   const nodes: BlockNode[] = [];
   for (let i = 0; i < nodeCount; i++) {
     const parentId = i === 0 ? undefined : Math.floor(random() * i);
-    
+
     // Joint Diversity
     let jointType = JointType.REVOLUTE;
     if (parentId !== undefined) {
-        if (parentId === 0) {
-            jointType = JointType.SPHERICAL;
-        } else {
-            jointType = random() > 0.6 ? JointType.REVOLUTE : JointType.SPHERICAL;
-        }
+      if (parentId === 0) {
+        jointType = JointType.SPHERICAL;
+      } else {
+        jointType = random() > 0.6 ? JointType.REVOLUTE : JointType.SPHERICAL;
+      }
     }
 
     nodes.push({
       id: i,
       size: [
-          0.4 + random() * 0.4, 
-          0.2 + random() * 0.3, 
-          0.2 + random() * 0.3
+        0.4 + random() * 0.4,
+        0.2 + random() * 0.3,
+        0.2 + random() * 0.3
       ],
       color: COLORS[i % COLORS.length],
-      parentId: parentId, 
+      parentId: parentId,
       jointType: jointType,
       jointParams: {
         speed: 2 + random() * 4,     // 2 to 6
@@ -98,7 +98,7 @@ const generateRandomBrain = (morphNodes: number): { nodes: NeuralNode[]; connect
   for (let i = 0; i < numConnections; i++) {
     const source = nodes[Math.floor(random() * nodes.length)];
     const target = nodes[Math.floor(random() * nodes.length)];
-    
+
     if (source.type !== NodeType.ACTUATOR && target.type !== NodeType.SENSOR && source.id !== target.id) {
       connections.push({
         source: source.id,
@@ -130,7 +130,7 @@ export const generateIndividual = (generation: number, index: number): Individua
 // Mutate a genome in place
 const mutateGenome = (genome: Genome, rate: number) => {
   const { brain, morphology } = genome;
-  
+
   // Mutate Weights
   brain.connections.forEach(conn => {
     if (random() < rate) {
@@ -139,16 +139,16 @@ const mutateGenome = (genome: Genome, rate: number) => {
   });
 
   // Add Random Connection
-  if (random() < rate * 0.5) {
-     const source = brain.nodes[Math.floor(random() * brain.nodes.length)];
-     const target = brain.nodes[Math.floor(random() * brain.nodes.length)];
-     if (source.type !== NodeType.ACTUATOR && target.type !== NodeType.SENSOR && source.id !== target.id) {
-        brain.connections.push({
-          source: source.id,
-          target: target.id,
-          weight: (random() * 2) - 1
-        });
-     }
+  if (random() < rate * 0.5 && brain.nodes.length > 0) {
+    const source = brain.nodes[Math.floor(random() * brain.nodes.length)];
+    const target = brain.nodes[Math.floor(random() * brain.nodes.length)];
+    if (source && target && source.type !== NodeType.ACTUATOR && target.type !== NodeType.SENSOR && source.id !== target.id) {
+      brain.connections.push({
+        source: source.id,
+        target: target.id,
+        weight: (random() * 2) - 1
+      });
+    }
   }
 
   // Mutate Morphology (Motor Control)
@@ -160,7 +160,7 @@ const mutateGenome = (genome: Genome, rate: number) => {
 
       // Mutate Phase
       if (random() < 0.5) {
-         block.jointParams.phase += (random() * 0.5) - 0.25;
+        block.jointParams.phase += (random() * 0.5) - 0.25;
       }
 
       // Mutate Amp
@@ -168,87 +168,87 @@ const mutateGenome = (genome: Genome, rate: number) => {
         block.jointParams.amp += (random() * 0.2) - 0.1;
         block.jointParams.amp = Math.max(0.1, Math.min(1.5, block.jointParams.amp));
       }
-      
+
       // Rare: Mutate attachment face
       if (block.parentId !== undefined && random() < 0.05) {
-          block.attachFace = Math.floor(random() * 6);
+        block.attachFace = Math.floor(random() * 6);
       }
     }
   });
 
   // NEW: Add Block (Growth)
   if (random() < rate) {
-     const parent = morphology[Math.floor(random() * morphology.length)];
-     const currentMaxId = morphology.reduce((max, n) => Math.max(max, n.id), 0);
-     const newId = currentMaxId + 1;
-     
-     morphology.push({
-        id: newId,
-        parentId: parent.id,
-        size: [
-            0.4 + random() * 0.4, 
-            0.2 + random() * 0.3, 
-            0.2 + random() * 0.3
-        ],
-        color: COLORS[newId % COLORS.length],
-        jointType: random() > 0.5 ? JointType.REVOLUTE : JointType.SPHERICAL,
-        jointParams: {
-          speed: 2 + random() * 4,
-          phase: random() * Math.PI * 2,
-          amp: 0.5 + random() * 0.5
-        },
-        attachFace: Math.floor(random() * 6)
-     });
-     
-     // Add Actuator
-     const actuatorId = `a${newId}`;
-     brain.nodes.push({
-        id: actuatorId,
-        type: NodeType.ACTUATOR,
-        label: `Joint ${newId}`,
-        activation: 0,
-        x: 0.9,
-        y: 0.1 + random() * 0.8
-     });
-     
-     // Connect Actuator
-     const inputs = brain.nodes.filter(n => n.type !== NodeType.ACTUATOR);
-     if (inputs.length > 0) {
-         const source = inputs[Math.floor(random() * inputs.length)];
-         brain.connections.push({
-             source: source.id,
-             target: actuatorId,
-             weight: (random() * 2) - 1
-         });
-     }
+    const parent = morphology[Math.floor(random() * morphology.length)];
+    const currentMaxId = morphology.reduce((max, n) => Math.max(max, n.id), 0);
+    const newId = currentMaxId + 1;
+
+    morphology.push({
+      id: newId,
+      parentId: parent.id,
+      size: [
+        0.4 + random() * 0.4,
+        0.2 + random() * 0.3,
+        0.2 + random() * 0.3
+      ],
+      color: COLORS[newId % COLORS.length],
+      jointType: random() > 0.5 ? JointType.REVOLUTE : JointType.SPHERICAL,
+      jointParams: {
+        speed: 2 + random() * 4,
+        phase: random() * Math.PI * 2,
+        amp: 0.5 + random() * 0.5
+      },
+      attachFace: Math.floor(random() * 6)
+    });
+
+    // Add Actuator
+    const actuatorId = `a${newId}`;
+    brain.nodes.push({
+      id: actuatorId,
+      type: NodeType.ACTUATOR,
+      label: `Joint ${newId}`,
+      activation: 0,
+      x: 0.9,
+      y: 0.1 + random() * 0.8
+    });
+
+    // Connect Actuator
+    const inputs = brain.nodes.filter(n => n.type !== NodeType.ACTUATOR);
+    if (inputs.length > 0) {
+      const source = inputs[Math.floor(random() * inputs.length)];
+      brain.connections.push({
+        source: source.id,
+        target: actuatorId,
+        weight: (random() * 2) - 1
+      });
+    }
   }
 
   // NEW: Remove Block (Pruning)
   if (random() < rate * 0.5 && morphology.length > 1) {
-      const parentIds = new Set(morphology.map(n => n.parentId).filter(id => id !== undefined));
-      const leaves = morphology.filter(n => !parentIds.has(n.id) && n.parentId !== undefined);
-      
-      if (leaves.length > 0) {
-          const toRemove = leaves[Math.floor(random() * leaves.length)];
-          
-          // Remove from morphology
-          const idx = morphology.findIndex(n => n.id === toRemove.id);
-          if (idx !== -1) morphology.splice(idx, 1);
-          
-          // Remove associated Actuator and connections
-          const actuatorId = `a${toRemove.id}`;
-          genome.brain.nodes = genome.brain.nodes.filter(n => n.id !== actuatorId);
-          genome.brain.connections = genome.brain.connections.filter(c => c.source !== actuatorId && c.target !== actuatorId);
-      }
+    const parentIds = new Set(morphology.map(n => n.parentId).filter(id => id !== undefined));
+    const leaves = morphology.filter(n => !parentIds.has(n.id) && n.parentId !== undefined);
+
+    if (leaves.length > 0) {
+      const toRemove = leaves[Math.floor(random() * leaves.length)];
+
+      // Remove from morphology
+      const idx = morphology.findIndex(n => n.id === toRemove.id);
+      if (idx !== -1) morphology.splice(idx, 1);
+
+      // Remove associated Actuator and connections
+      const actuatorId = `a${toRemove.id}`;
+      genome.brain.nodes = genome.brain.nodes.filter(n => n.id !== actuatorId);
+      genome.brain.connections = genome.brain.connections.filter(c => c.source !== actuatorId && c.target !== actuatorId);
+    }
   }
 };
 
 export const evolvePopulation = (
-  currentPop: Individual[], 
-  generation: number, 
+  currentPop: Individual[],
+  generation: number,
   mutationRate: number
 ): { newPop: Individual[], stats: { max: number, avg: number } } => {
-  
+
   // 1. Sort by Actual Fitness
   const sortedPop = [...currentPop].sort((a, b) => b.fitness - a.fitness);
 
@@ -258,11 +258,11 @@ export const evolvePopulation = (
   // 2. Elitism (Keep top 10%)
   const eliteCount = Math.max(2, Math.floor(sortedPop.length * 0.1));
   const elites = sortedPop.slice(0, eliteCount);
-  
+
   const nextGenElites = elites.map(ind => ({
-      ...ind,
-      fitness: 0, 
-      generation: generation + 1
+    ...ind,
+    fitness: 0,
+    generation: generation + 1
   }));
 
   const newPop: Individual[] = [...nextGenElites];
@@ -270,12 +270,12 @@ export const evolvePopulation = (
   // 3. Reproduction
   while (newPop.length < currentPop.length) {
     // Tournament Selection
-    const parent1 = sortedPop[Math.floor(random() * (sortedPop.length / 2))]; 
+    const parent1 = sortedPop[Math.floor(random() * (sortedPop.length / 2))];
     const parent2 = sortedPop[Math.floor(random() * (sortedPop.length / 2))];
-    
+
     // Clone Parent 1 (Simplified Crossover)
     const offspringGenome = JSON.parse(JSON.stringify(parent1.genome));
-    
+
     // Mutate
     mutateGenome(offspringGenome, mutationRate);
 
@@ -287,7 +287,7 @@ export const evolvePopulation = (
       isAlive: true,
       genome: offspringGenome
     };
-    
+
     newPop.push(offspring);
   }
 

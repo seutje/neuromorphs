@@ -326,6 +326,12 @@ function App() {
     setSelectedBlockId(null);
   };
 
+  const handleLoadPreset = (presetGenome: Genome) => {
+    const cloned = JSON.parse(JSON.stringify(presetGenome));
+    addToHistory(cloned, 'Loaded Preset');
+    setSelectedBlockId(null);
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-emerald-500/30">
 
@@ -458,6 +464,7 @@ function App() {
                   genome={editedGenome}
                   selectedBlockId={selectedBlockId}
                   onSelectBlock={setSelectedBlockId}
+                  onLoadPreset={handleLoadPreset}
                 />
               )
             )}

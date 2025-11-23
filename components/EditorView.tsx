@@ -57,6 +57,10 @@ export const EditorView: React.FC<EditorViewProps> = ({ genome, onUpdateGenome, 
           genome={genome}
           selectedBlockId={selectedBlockId}
           onSelectBlock={setSelectedBlockId}
+          onLoadPreset={(newGenome) => {
+            onUpdateGenome(newGenome);
+            setSelectedBlockId(null);
+          }}
         />
       </div>
 
