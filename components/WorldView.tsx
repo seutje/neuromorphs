@@ -38,8 +38,10 @@ export const WorldView: React.FC<WorldViewProps> = ({
 
   // Worker & State
   const workerRef = useRef<Worker | null>(null);
-  const meshMapRef = useRef<THREE.Mesh[]>([]); // Flat list of meshes matching worker order
-  const idMapRef = useRef<Map<string, THREE.Mesh>>(new Map()); // Map for camera follow (id -> root mesh)
+  const instancedMeshRef = useRef<THREE.InstancedMesh | null>(null);
+  const scalesRef = useRef<Float32Array | null>(null); // Store scales for matrix updates
+  const instanceIdMapRef = useRef<Map<number, { individualId: string; blockId: number }>>(new Map());
+  const idToInstanceIdsRef = useRef<Map<string, number[]>>(new Map()); // Map individual ID to list of instance IDs for camera follow
 
   const raycasterRef = useRef<THREE.Raycaster>(new THREE.Raycaster());
   const mouseRef = useRef<THREE.Vector2>(new THREE.Vector2());
@@ -78,24 +80,35 @@ export const WorldView: React.FC<WorldViewProps> = ({
 
         // Apply transforms
         // transforms is a Float32Array: [x, y, z, qx, qy, qz, qw, ...]
-        const meshes = meshMapRef.current;
-        if (meshes.length * 7 === transforms.length) {
-          for (let i = 0; i < meshes.length; i++) {
+        const instancedMesh = instancedMeshRef.current;
+        const scales = scalesRef.current;
+
+        if (instancedMesh && scales && instancedMesh.count * 7 === transforms.length) {
+          const dummy = new THREE.Object3D();
+
+          for (let i = 0; i < instancedMesh.count; i++) {
             const offset = i * 7;
-            const mesh = meshes[i];
 
-            const x = transforms[offset];
-            const y = transforms[offset + 1];
-            const z = transforms[offset + 2];
-
-            mesh.position.set(x, y, z);
-            mesh.quaternion.set(
+            dummy.position.set(
+              transforms[offset],
+              transforms[offset + 1],
+              transforms[offset + 2]
+            );
+            dummy.quaternion.set(
               transforms[offset + 3],
               transforms[offset + 4],
               transforms[offset + 5],
               transforms[offset + 6]
             );
+
+            // Apply stored scale
+            const sOffset = i * 3;
+            dummy.scale.set(scales[sOffset], scales[sOffset + 1], scales[sOffset + 2]);
+
+            dummy.updateMatrix();
+            instancedMesh.setMatrixAt(i, dummy.matrix);
           }
+          instancedMesh.instanceMatrix.needsUpdate = true;
         }
 
         // Report fitness
@@ -165,9 +178,12 @@ export const WorldView: React.FC<WorldViewProps> = ({
       const intersects = raycasterRef.current.intersectObjects(sceneRef.current.children);
 
       for (const intersect of intersects) {
-        if (intersect.object.userData.individualId) {
-          onSelectIdRef.current(intersect.object.userData.individualId);
-          break;
+        if (intersect.object === instancedMeshRef.current && intersect.instanceId !== undefined) {
+          const data = instanceIdMapRef.current.get(intersect.instanceId);
+          if (data) {
+            onSelectIdRef.current(data.individualId);
+            break;
+          }
         }
       }
     };
@@ -186,10 +202,14 @@ export const WorldView: React.FC<WorldViewProps> = ({
       const currentSelectedId = selectedIdRef.current;
       let targetPos: THREE.Vector3 | null = null;
 
-      if (currentSelectedId) {
-        const targetMesh = idMapRef.current.get(currentSelectedId);
-        if (targetMesh) {
-          targetPos = targetMesh.position.clone();
+      if (currentSelectedId && instancedMeshRef.current) {
+        const instanceIds = idToInstanceIdsRef.current.get(currentSelectedId);
+        if (instanceIds && instanceIds.length > 0) {
+          // Use the first block (root) for tracking
+          const rootInstanceId = instanceIds[0];
+          const matrix = new THREE.Matrix4();
+          instancedMeshRef.current.getMatrixAt(rootInstanceId, matrix);
+          targetPos = new THREE.Vector3().setFromMatrixPosition(matrix);
         }
       }
 
@@ -208,29 +228,9 @@ export const WorldView: React.FC<WorldViewProps> = ({
         }
       }
 
-      // Frustum Culling Update
-      if (cameraRef.current) {
-        cameraRef.current.updateMatrixWorld();
-        projScreenMatrix.multiplyMatrices(
-          cameraRef.current.projectionMatrix,
-          cameraRef.current.matrixWorldInverse
-        );
-        frustum.setFromProjectionMatrix(projScreenMatrix);
-
-        const meshes = meshMapRef.current;
-        for (let i = 0; i < meshes.length; i++) {
-          const mesh = meshes[i];
-          // Check visibility
-          const inFrustum = frustum.containsPoint(mesh.position);
-          const distance = cameraRef.current.position.distanceTo(mesh.position);
-
-          if (mesh.position.y < -50 || !inFrustum || distance > 100) {
-            mesh.visible = false;
-          } else {
-            mesh.visible = true;
-          }
-        }
-      }
+      // Frustum Culling Update - Removed for InstancedMesh performance
+      // InstancedMesh handles its own culling (whole mesh), and per-instance culling on CPU is expensive.
+      // The GPU can handle drawing all instances efficiently.
 
       if (rendererRef.current && sceneRef.current && cameraRef.current) {
         rendererRef.current.render(sceneRef.current, cameraRef.current);
@@ -320,15 +320,41 @@ export const WorldView: React.FC<WorldViewProps> = ({
 
     // --- Rebuild Meshes ---
     // Clear old meshes
-    meshMapRef.current.forEach(mesh => {
-      sceneRef.current?.remove(mesh);
-      mesh.geometry.dispose();
-      (mesh.material as THREE.Material).dispose();
-    });
-    meshMapRef.current = [];
-    idMapRef.current.clear();
+    if (instancedMeshRef.current) {
+      sceneRef.current?.remove(instancedMeshRef.current);
+      instancedMeshRef.current.geometry.dispose();
+      (instancedMeshRef.current.material as THREE.Material).dispose();
+      instancedMeshRef.current = null;
+    }
+    instanceIdMapRef.current.clear();
+    idToInstanceIdsRef.current.clear();
 
-    // Create new meshes
+    // Calculate total blocks
+    let totalBlocks = 0;
+    population.forEach(ind => {
+      totalBlocks += ind.genome.morphology.length;
+    });
+
+    if (totalBlocks === 0) return;
+
+    // Create InstancedMesh
+    const geometry = new THREE.BoxGeometry(1, 1, 1); // Unit cube
+    const material = new THREE.MeshStandardMaterial({
+      roughness: 0.6,
+      metalness: 0.1
+    });
+    const instancedMesh = new THREE.InstancedMesh(geometry, material, totalBlocks);
+    instancedMesh.castShadow = true;
+    instancedMesh.receiveShadow = true;
+
+    // Storage for scales
+    const scales = new Float32Array(totalBlocks * 3);
+    scalesRef.current = scales;
+
+    const dummy = new THREE.Object3D();
+    let instanceIndex = 0;
+
+    // Initialize instances
     population.forEach((ind, index) => {
       let zPos = 0;
       if (index > 0) {
@@ -337,33 +363,42 @@ export const WorldView: React.FC<WorldViewProps> = ({
       }
       const startPos = { x: 0, y: 4, z: zPos };
 
-      ind.genome.morphology.forEach(block => {
-        const geometry = new THREE.BoxGeometry(block.size[0], block.size[1], block.size[2]);
-        const material = new THREE.MeshStandardMaterial({
-          color: block.color,
-          roughness: 0.6,
-          metalness: 0.1
-        });
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        mesh.userData = { individualId: ind.id, blockId: block.id };
+      const instanceIds: number[] = [];
 
-        // Initial position (will be updated by worker immediately)
-        mesh.position.set(
+      ind.genome.morphology.forEach(block => {
+        // Set Color
+        instancedMesh.setColorAt(instanceIndex, new THREE.Color(block.color));
+
+        // Set Scale
+        scales[instanceIndex * 3] = block.size[0];
+        scales[instanceIndex * 3 + 1] = block.size[1];
+        scales[instanceIndex * 3 + 2] = block.size[2];
+
+        // Initial Position (approximate, will be overwritten by worker)
+        dummy.position.set(
           startPos.x + (block.parentId !== undefined ? 1 : 0) * (block.id * 0.5),
           startPos.y + block.id * 0.2,
           startPos.z
         );
+        dummy.scale.set(block.size[0], block.size[1], block.size[2]);
+        dummy.updateMatrix();
+        instancedMesh.setMatrixAt(instanceIndex, dummy.matrix);
 
-        sceneRef.current?.add(mesh);
-        meshMapRef.current.push(mesh);
+        // Map ID
+        instanceIdMapRef.current.set(instanceIndex, { individualId: ind.id, blockId: block.id });
+        instanceIds.push(instanceIndex);
 
-        if (block.id === 0) { // Root block
-          idMapRef.current.set(ind.id, mesh);
-        }
+        instanceIndex++;
       });
+
+      idToInstanceIdsRef.current.set(ind.id, instanceIds);
     });
+
+    sceneRef.current?.add(instancedMesh);
+    instancedMeshRef.current = instancedMesh;
+
+    if (instancedMesh.instanceColor) instancedMesh.instanceColor.needsUpdate = true;
+    instancedMesh.instanceMatrix.needsUpdate = true;
 
     // Send to Worker
     workerRef.current.postMessage({
