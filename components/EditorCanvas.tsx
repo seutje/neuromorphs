@@ -146,6 +146,10 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({ genome, selectedBloc
             const mesh = new THREE.Mesh(geometry, material);
             mesh.castShadow = true;
             mesh.receiveShadow = true;
+            if (block.rotation && block.parentId === undefined) {
+                const [rx, ry, rz] = block.rotation.map(angle => THREE.MathUtils.degToRad(angle));
+                mesh.rotation.set(rx, ry, rz);
+            }
             mesh.userData = { blockId: block.id };
             parts.set(block.id, { mesh, block });
         });
@@ -233,6 +237,11 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({ genome, selectedBloc
                     if (vAxis === 0) mesh.position.x -= cOffset[1];
                     if (vAxis === 1) mesh.position.y -= cOffset[1];
                     if (vAxis === 2) mesh.position.z -= cOffset[1];
+
+                    if (currentBlock.rotation) {
+                        const [rx, ry, rz] = currentBlock.rotation.map(angle => THREE.MathUtils.degToRad(angle));
+                        pivot.rotation.set(rx, ry, rz);
+                    }
 
                     pivot.add(mesh);
 

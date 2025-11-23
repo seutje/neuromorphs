@@ -19,17 +19,18 @@ export const EditorView: React.FC<EditorViewProps> = ({ genome, onUpdateGenome, 
     onUpdateGenome({ ...genome, morphology: newMorphology });
   };
 
-  const handleAddChild = (parentId: number, face: number) => {
-    const newId = Math.max(...genome.morphology.map(b => b.id)) + 1;
-    const newBlock: BlockNode = {
-      id: newId,
-      size: [1, 1, 1],
-      color: '#34d399', // Emerald-400 default
-      parentId: parentId,
-      attachFace: face,
-      jointType: JointType.REVOLUTE,
-      jointParams: { speed: 5, phase: 0, amp: 1.0 }
-    };
+    const handleAddChild = (parentId: number, face: number) => {
+      const newId = Math.max(...genome.morphology.map(b => b.id)) + 1;
+      const newBlock: BlockNode = {
+        id: newId,
+        size: [1, 1, 1],
+        color: '#34d399', // Emerald-400 default
+        parentId: parentId,
+        attachFace: face,
+        rotation: [0, 0, 0],
+        jointType: JointType.REVOLUTE,
+        jointParams: { speed: 5, phase: 0, amp: 1.0 }
+      };
 
     onUpdateGenome({ ...genome, morphology: [...genome.morphology, newBlock] });
     setSelectedBlockId(newId);

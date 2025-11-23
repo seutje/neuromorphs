@@ -33,6 +33,14 @@ export const EditorPropertiesPanel: React.FC<EditorPropertiesPanelProps> = ({
         handleChange('size', newSize);
     };
 
+    const handleRotationChange = (index: number, value: number) => {
+        if (!selectedBlock) return;
+        const rotation = selectedBlock.rotation || [0, 0, 0];
+        const newRotation = [...rotation] as [number, number, number];
+        newRotation[index] = parseFloat(value.toString());
+        handleChange('rotation', newRotation);
+    };
+
     const handleJointParamChange = (field: string, value: number) => {
         if (!selectedBlock) return;
         const newParams = { ...selectedBlock.jointParams, [field]: parseFloat(value.toString()) };
@@ -85,6 +93,21 @@ export const EditorPropertiesPanel: React.FC<EditorPropertiesPanelProps> = ({
                                             max="5.0"
                                             value={selectedBlock.size[i]}
                                             onChange={(e) => handleSizeChange(i, parseFloat(e.target.value))}
+                                            className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-sm text-white focus:border-emerald-500 outline-none"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2">
+                                {['X', 'Y', 'Z'].map((axis, i) => (
+                                    <div key={axis}>
+                                        <label className="text-[10px] text-slate-500 block mb-1">Rot {axis} (°)</label>
+                                        <input
+                                            type="number"
+                                            step="1"
+                                            value={(selectedBlock.rotation || [0, 0, 0])[i]}
+                                            onChange={(e) => handleRotationChange(i, parseFloat(e.target.value))}
                                             className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-sm text-white focus:border-emerald-500 outline-none"
                                         />
                                     </div>

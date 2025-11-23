@@ -27,6 +27,9 @@ interface BrainInstance {
     connectionsByTarget: Map<string, NeuralConnection[]>;
 }
 
+type Vec3 = { x: number; y: number; z: number };
+type Quat = { x: number; y: number; z: number; w: number };
+
 // --- State ---
 
 let world: RAPIER.World | null = null;
@@ -42,6 +45,67 @@ let simTime = 0;
 let lastTime = 0;
 
 // --- Helpers ---
+
+const degToRad = (deg: number) => deg * (Math.PI / 180);
+
+const eulerToQuat = (rotation?: [number, number, number]): Quat => {
+    const [xDeg, yDeg, zDeg] = rotation || [0, 0, 0];
+    const x = degToRad(xDeg) / 2;
+    const y = degToRad(yDeg) / 2;
+    const z = degToRad(zDeg) / 2;
+
+    const sinX = Math.sin(x), cosX = Math.cos(x);
+    const sinY = Math.sin(y), cosY = Math.cos(y);
+    const sinZ = Math.sin(z), cosZ = Math.cos(z);
+
+    return {
+        x: sinX * cosY * cosZ - cosX * sinY * sinZ,
+        y: cosX * sinY * cosZ + sinX * cosY * sinZ,
+        z: cosX * cosY * sinZ - sinX * sinY * cosZ,
+        w: cosX * cosY * cosZ + sinX * sinY * sinZ
+    };
+};
+
+const quatMultiply = (a: Quat, b: Quat): Quat => ({
+    w: a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z,
+    x: a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+    y: a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+    z: a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w
+});
+
+const quatConjugate = (q: Quat): Quat => ({ w: q.w, x: -q.x, y: -q.y, z: -q.z });
+
+const quatInvert = (q: Quat): Quat => {
+    const norm = q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z;
+    if (norm === 0) return { w: 1, x: 0, y: 0, z: 0 };
+    const inv = 1 / norm;
+    const c = quatConjugate(q);
+    return { w: c.w * inv, x: c.x * inv, y: c.y * inv, z: c.z * inv };
+};
+
+const rotateVecByQuat = (v: Vec3, q: Quat): Vec3 => {
+    const u = { x: q.x, y: q.y, z: q.z };
+    const s = q.w;
+
+    const cross = (a: Vec3, b: Vec3): Vec3 => ({
+        x: a.y * b.z - a.z * b.y,
+        y: a.z * b.x - a.x * b.z,
+        z: a.x * b.y - a.y * b.x
+    });
+
+    const uCrossV = cross(u, v);
+    const uCrossUCrossV = cross(u, uCrossV);
+
+    return {
+        x: v.x + 2 * (s * uCrossV.x + uCrossUCrossV.x),
+        y: v.y + 2 * (s * uCrossV.y + uCrossUCrossV.y),
+        z: v.z + 2 * (s * uCrossV.z + uCrossUCrossV.z)
+    };
+};
+
+const addVec = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z });
+const subVec = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
+const scaleVec = (v: Vec3, s: number): Vec3 => ({ x: v.x * s, y: v.y * s, z: v.z * s });
 
 const buildBrainInstance = (genome: Genome): BrainInstance => {
     const activations: Record<string, number> = {};
@@ -190,14 +254,14 @@ function setupWorld(population: Individual[]) {
             }
         });
 
-        // Calculate Positions
-        const positions = new Map<number, { x: number, y: number, z: number }>();
+        const transforms = new Map<number, { pos: Vec3; rot: Quat }>();
+        const pivotPositions = new Map<number, Vec3>();
         const queue: number[] = [];
 
-        // Find roots
+        // Roots start at spawn position with their own rotation
         nodes.forEach(b => {
             if (b.parentId === undefined) {
-                positions.set(b.id, { ...startPos });
+                transforms.set(b.id, { pos: { ...startPos }, rot: eulerToQuat(b.rotation) });
                 queue.push(b.id);
             }
         });
@@ -205,7 +269,7 @@ function setupWorld(population: Individual[]) {
         // BFS Traversal to calculate positions
         while (queue.length > 0) {
             const parentId = queue.shift()!;
-            const parentPos = positions.get(parentId)!;
+            const parentTransform = transforms.get(parentId)!;
             const parentBlock = nodes.find(n => n.id === parentId)!;
             const children = parentToChildren.get(parentId) || [];
 
@@ -223,74 +287,56 @@ function setupWorld(population: Individual[]) {
                 const childHalf = child.size[axisIdx] / 2;
 
                 let spreadOffset = 0;
-                let spreadAxis = 0;
+                let spreadAxisLocal: Vec3 = { x: 0, y: 0, z: 0 };
 
-                // Determine tangential axes for offsets
-                let uAxis = 0, vAxis = 0;
-                if (axisIdx === 0) { uAxis = 1; vAxis = 2; spreadAxis = 2; } // Face X -> Y, Z
-                else if (axisIdx === 1) { uAxis = 0; vAxis = 2; spreadAxis = 0; } // Face Y -> X, Z
-                else { uAxis = 0; vAxis = 1; spreadAxis = 0; } // Face Z -> X, Y
+                // Determine tangential axes for offsets (local to parent)
+                let uAxisLocal: Vec3 = { x: 0, y: 0, z: 0 };
+                let vAxisLocal: Vec3 = { x: 0, y: 0, z: 0 };
+                if (axisIdx === 0) { uAxisLocal = { x: 0, y: 1, z: 0 }; vAxisLocal = { x: 0, y: 0, z: 1 }; spreadAxisLocal = { x: 0, y: 0, z: 1 }; }
+                else if (axisIdx === 1) { uAxisLocal = { x: 1, y: 0, z: 0 }; vAxisLocal = { x: 0, y: 0, z: 1 }; spreadAxisLocal = { x: 1, y: 0, z: 0 }; }
+                else { uAxisLocal = { x: 1, y: 0, z: 0 }; vAxisLocal = { x: 0, y: 1, z: 0 }; spreadAxisLocal = { x: 1, y: 0, z: 0 }; }
 
                 if (countInFace > 1) {
-                    const parentDim = parentBlock.size[spreadAxis];
+                    const parentDim = parentBlock.size[axisIdx === 2 ? 0 : axisIdx === 1 ? 0 : 2];
                     const available = parentDim * 0.8;
                     const t = indexInFace / (countInFace - 1);
                     spreadOffset = (t - 0.5) * available;
                 }
 
-                // Calculate Anchors (a1 = parent, a2 = child)
-                // a1 is offset from parent center
-                let a1 = { x: 0, y: 0, z: 0 };
-                if (axisIdx === 0) a1.x = parentHalf * dir;
-                if (axisIdx === 1) a1.y = parentHalf * dir;
-                if (axisIdx === 2) a1.z = parentHalf * dir;
+                const axisVectorLocal = axisIdx === 0 ? { x: dir, y: 0, z: 0 } : axisIdx === 1 ? { x: 0, y: dir, z: 0 } : { x: 0, y: 0, z: dir };
 
-                if (spreadAxis === 0) a1.x += spreadOffset;
-                if (spreadAxis === 1) a1.y += spreadOffset;
-                if (spreadAxis === 2) a1.z += spreadOffset;
+                // Pivot position relative to parent (local frame)
+                let pivotOffsetLocal = scaleVec(axisVectorLocal, parentHalf);
+                pivotOffsetLocal = addVec(pivotOffsetLocal, scaleVec(spreadAxisLocal, spreadOffset));
 
-                // Apply Parent Offset
                 const pOffset = child.parentOffset || [0, 0];
-                if (uAxis === 0) a1.x += pOffset[0];
-                if (uAxis === 1) a1.y += pOffset[0];
-                if (uAxis === 2) a1.z += pOffset[0];
+                pivotOffsetLocal = addVec(pivotOffsetLocal, addVec(scaleVec(uAxisLocal, pOffset[0]), scaleVec(vAxisLocal, pOffset[1])));
 
-                if (vAxis === 0) a1.x += pOffset[1];
-                if (vAxis === 1) a1.y += pOffset[1];
-                if (vAxis === 2) a1.z += pOffset[1];
+                const pivotWorldOffset = rotateVecByQuat(pivotOffsetLocal, parentTransform.rot);
+                const pivotPos = addVec(parentTransform.pos, pivotWorldOffset);
 
-                // a2 is offset from child center
-                let a2 = { x: 0, y: 0, z: 0 };
-                if (axisIdx === 0) a2.x = -childHalf * dir;
-                if (axisIdx === 1) a2.y = -childHalf * dir;
-                if (axisIdx === 2) a2.z = -childHalf * dir;
-
-                // Apply Child Offset
+                // Child center relative to pivot (local parent frame)
+                let childOffsetLocal = scaleVec(axisVectorLocal, childHalf);
                 const cOffset = child.childOffset || [0, 0];
-                if (uAxis === 0) a2.x -= cOffset[0];
-                if (uAxis === 1) a2.y -= cOffset[0];
-                if (uAxis === 2) a2.z -= cOffset[0];
+                childOffsetLocal = addVec(childOffsetLocal, addVec(scaleVec(uAxisLocal, -cOffset[0]), scaleVec(vAxisLocal, -cOffset[1])));
 
-                if (vAxis === 0) a2.x -= cOffset[1];
-                if (vAxis === 1) a2.y -= cOffset[1];
-                if (vAxis === 2) a2.z -= cOffset[1];
+                const localChildRot = eulerToQuat(child.rotation);
+                const rotatedChildOffset = rotateVecByQuat(childOffsetLocal, localChildRot);
+                const childOffsetWorld = rotateVecByQuat(rotatedChildOffset, parentTransform.rot);
 
-                // Child World Pos = Parent World Pos + a1 - a2
-                // (Assuming no rotation initially)
-                const childPos = {
-                    x: parentPos.x + a1.x - a2.x,
-                    y: parentPos.y + a1.y - a2.y,
-                    z: parentPos.z + a1.z - a2.z
-                };
+                const childPos = addVec(pivotPos, childOffsetWorld);
+                const childRot = quatMultiply(parentTransform.rot, localChildRot);
 
-                positions.set(child.id, childPos);
+                transforms.set(child.id, { pos: childPos, rot: childRot });
+                pivotPositions.set(child.id, pivotPos);
                 queue.push(child.id);
             });
         }
 
         // Create Bodies
         nodes.forEach(block => {
-            const pos = positions.get(block.id) || startPos;
+            const transform = transforms.get(block.id) || { pos: startPos, rot: { x: 0, y: 0, z: 0, w: 1 } };
+            const pos = transform.pos;
 
             const rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic();
             rigidBodyDesc.setLinearDamping(0.5);
@@ -298,6 +344,7 @@ function setupWorld(population: Individual[]) {
             rigidBodyDesc.setTranslation(pos.x, pos.y, pos.z);
 
             const body = world!.createRigidBody(rigidBodyDesc);
+            body.setRotation(transform.rot, true);
 
             const colliderDesc = RAPIER.ColliderDesc.cuboid(
                 (block.size[0] / 2) * 0.95,
@@ -328,74 +375,23 @@ function setupWorld(population: Individual[]) {
             const parentBlock = nodes.find(n => n.id === block.parentId);
 
             if (parentBody && childBody && parentBlock) {
-                const siblings = parentToChildren.get(block.parentId) || [];
-                const faceGroup = siblings.filter(s => s.attachFace === block.attachFace);
-                const indexInFace = faceGroup.findIndex(s => s.id === block.id);
-                const countInFace = faceGroup.length;
+                const pivotPos = pivotPositions.get(block.id);
+                const parentTransform = transforms.get(block.parentId)!;
+                const childTransform = transforms.get(block.id)!;
 
-                const face = block.attachFace;
-                const axisIdx = Math.floor(face / 2);
-                const dir = face % 2 === 0 ? 1 : -1;
+                if (!pivotPos) return;
 
-                const parentHalf = parentBlock.size[axisIdx] / 2;
-                const childHalf = block.size[axisIdx] / 2;
+                const anchorParentWorld = subVec(pivotPos, parentTransform.pos);
+                const anchorChildWorld = subVec(pivotPos, childTransform.pos);
 
-                let spreadOffset = 0;
-                let spreadAxis = 0;
+                const invParentRot = quatInvert(parentTransform.rot);
+                const invChildRot = quatInvert(childTransform.rot);
 
-                // Determine tangential axes for offsets
-                let uAxis = 0, vAxis = 0;
-                if (axisIdx === 0) { uAxis = 1; vAxis = 2; spreadAxis = 2; } // Face X -> Y, Z
-                else if (axisIdx === 1) { uAxis = 0; vAxis = 2; spreadAxis = 0; } // Face Y -> X, Z
-                else { uAxis = 0; vAxis = 1; spreadAxis = 0; } // Face Z -> X, Y
+                const a1 = rotateVecByQuat(anchorParentWorld, invParentRot);
+                const a2 = rotateVecByQuat(anchorChildWorld, invChildRot);
 
-                if (countInFace > 1) {
-                    const parentDim = parentBlock.size[spreadAxis];
-                    const available = parentDim * 0.8;
-                    const t = indexInFace / (countInFace - 1);
-                    spreadOffset = (t - 0.5) * available;
-                }
-
-                let a1 = { x: 0, y: 0, z: 0 };
-                if (axisIdx === 0) a1.x = parentHalf * dir;
-                if (axisIdx === 1) a1.y = parentHalf * dir;
-                if (axisIdx === 2) a1.z = parentHalf * dir;
-
-                if (spreadAxis === 0) a1.x += spreadOffset;
-                if (spreadAxis === 1) a1.y += spreadOffset;
-                if (spreadAxis === 2) a1.z += spreadOffset;
-
-                // Apply Parent Offset
-                const pOffset = block.parentOffset || [0, 0];
-                if (uAxis === 0) a1.x += pOffset[0];
-                if (uAxis === 1) a1.y += pOffset[0];
-                if (uAxis === 2) a1.z += pOffset[0];
-
-                if (vAxis === 0) a1.x += pOffset[1];
-                if (vAxis === 1) a1.y += pOffset[1];
-                if (vAxis === 2) a1.z += pOffset[1];
-
-                let a2 = { x: 0, y: 0, z: 0 };
-                if (axisIdx === 0) a2.x = -childHalf * dir;
-                if (axisIdx === 1) a2.y = -childHalf * dir;
-                if (axisIdx === 2) a2.z = -childHalf * dir;
-
-                // Apply Child Offset
-                const cOffset = block.childOffset || [0, 0];
-                if (uAxis === 0) a2.x -= cOffset[0];
-                if (uAxis === 1) a2.y -= cOffset[0];
-                if (uAxis === 2) a2.z -= cOffset[0];
-
-                if (vAxis === 0) a2.x -= cOffset[1];
-                if (vAxis === 1) a2.y -= cOffset[1];
-                if (vAxis === 2) a2.z -= cOffset[1];
-
-                let axis;
-                if (block.jointType === JointType.SPHERICAL) {
-                    axis = { x: 0, y: 1, z: 0 };
-                } else {
-                    axis = { x: 0, y: 0, z: 1 };
-                }
+                const axisWorld = rotateVecByQuat({ x: 0, y: 0, z: 1 }, childTransform.rot);
+                const axis = rotateVecByQuat(axisWorld, invParentRot);
 
                 const jointData = RAPIER.JointData.revolute(a1, a2, axis);
                 jointData.limitsEnabled = true;

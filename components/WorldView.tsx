@@ -400,6 +400,12 @@ export const WorldView: React.FC<WorldViewProps> = ({
           startPos.y + block.id * 0.2,
           startPos.z
         );
+        const rotation = block.rotation || [0, 0, 0];
+        dummy.rotation.set(
+          THREE.MathUtils.degToRad(rotation[0]),
+          THREE.MathUtils.degToRad(rotation[1]),
+          THREE.MathUtils.degToRad(rotation[2])
+        );
         dummy.scale.set(block.size[0], block.size[1], block.size[2]);
         dummy.updateMatrix();
         instancedMesh.setMatrixAt(instanceIndex, dummy.matrix);

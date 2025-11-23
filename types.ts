@@ -10,6 +10,7 @@ export interface BlockNode {
   size: [number, number, number]; // [x, y, z]
   color: string;
   parentId?: number; // Root has no parent
+  rotation?: [number, number, number]; // Euler rotation in degrees [x, y, z]
   jointType?: JointType;
   jointParams: {
     speed: number;

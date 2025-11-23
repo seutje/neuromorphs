@@ -92,6 +92,7 @@ const generateRandomMorphology = (nodeCount: number): BlockNode[] => {
       size: size,
       color: COLORS[i % COLORS.length],
       parentId: parentId,
+      rotation: [0, 0, 0],
       jointType: jointType,
       jointParams: {
         speed: 2 + random() * 4,     // 2 to 6
@@ -259,6 +260,14 @@ export const mutateGenome = (genome: Genome, rate: number) => {
           block.childOffset[0] = Math.max(-childLimitU, Math.min(childLimitU, block.childOffset[0]));
           block.childOffset[1] = Math.max(-childLimitV, Math.min(childLimitV, block.childOffset[1]));
         }
+
+        // Mutate rotation
+        if (random() < rate * 0.5) {
+          const rotation = block.rotation || [0, 0, 0];
+          const axisToNudge = Math.floor(random() * 3);
+          rotation[axisToNudge] += (random() * 20) - 10; // +/-10 degrees
+          block.rotation = rotation.map(r => Math.max(-180, Math.min(180, r))) as [number, number, number];
+        }
       }
     }
   });
@@ -311,6 +320,7 @@ export const mutateGenome = (genome: Genome, rate: number) => {
       parentId: parent.id,
       size: size,
       color: COLORS[newId % COLORS.length],
+      rotation: [0, 0, 0],
       jointType: random() > 0.5 ? JointType.REVOLUTE : JointType.SPHERICAL,
       jointParams: {
         speed: 2 + random() * 4,

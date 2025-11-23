@@ -209,6 +209,10 @@ export const MorphologyVisualizer: React.FC<MorphologyVisualizerProps> = ({ geno
       const geometry = new THREE.BoxGeometry(block.size[0], block.size[1], block.size[2]);
       const material = new THREE.MeshStandardMaterial({ color: block.color, roughness: 0.3 });
       const mesh = new THREE.Mesh(geometry, material);
+      if (block.rotation && block.parentId === undefined) {
+        const [rx, ry, rz] = block.rotation.map(angle => THREE.MathUtils.degToRad(angle));
+        mesh.rotation.set(rx, ry, rz);
+      }
       parts.set(block.id, { mesh, block });
     });
 
@@ -306,6 +310,11 @@ export const MorphologyVisualizer: React.FC<MorphologyVisualizerProps> = ({ geno
           if (vAxis === 0) mesh.position.x -= cOffset[1];
           if (vAxis === 1) mesh.position.y -= cOffset[1];
           if (vAxis === 2) mesh.position.z -= cOffset[1];
+
+          if (currentBlock.rotation) {
+            const [rx, ry, rz] = currentBlock.rotation.map(angle => THREE.MathUtils.degToRad(angle));
+            pivot.rotation.set(rx, ry, rz);
+          }
 
           pivot.add(mesh);
 
