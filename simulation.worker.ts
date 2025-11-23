@@ -419,7 +419,8 @@ function loop() {
         type: 'UPDATE',
         payload: {
             transforms: data,
-            fitness: fitnessUpdate
+            fitness: fitnessUpdate,
+            simTime: simTime
         }
     }, { transfer: [data.buffer] });
 

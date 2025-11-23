@@ -103,6 +103,8 @@ function App() {
     });
   }, []);
 
+
+
   // Evolution Loop
   const stepGeneration = useCallback(() => {
     setPopulation(prevPop => {
@@ -136,43 +138,26 @@ function App() {
     });
   }, [config.mutationRate]);
 
+  // Simulation Time Handler
+  const handleTimeUpdate = useCallback((simTime: number) => {
+    // Update UI Timer
+    const remaining = Math.max(0, config.epochDuration - simTime);
+    setTimeLeft(remaining);
+
+    // Check Epoch End
+    if (simTime >= config.epochDuration) {
+      stepGeneration();
+    }
+  }, [config.epochDuration, stepGeneration]);
+
   // Game Loop Handler
   useEffect(() => {
     const animate = () => {
-      const now = Date.now();
-      let dt = now - lastFrameTimeRef.current;
-
-      // Prevent huge jumps if tab was inactive or just started
-      if (dt > 500) dt = 16;
-
-      lastFrameTimeRef.current = now;
-
-      // Calculate simulated time delta (in seconds)
-      const dtSeconds = dt / 1000;
-      const simDt = dtSeconds * config.simulationSpeed;
-
-      epochTimeAccumulatorRef.current += simDt;
-
-      // Update UI Timer (throttled)
-      if (now - lastTimerUpdateRef.current > 100) {
-        const remaining = Math.max(0, config.epochDuration - epochTimeAccumulatorRef.current);
-        setTimeLeft(remaining);
-        lastTimerUpdateRef.current = now;
-      }
-
-      // Check Epoch End
-      if (epochTimeAccumulatorRef.current >= config.epochDuration) {
-        stepGeneration();
-        epochTimeAccumulatorRef.current = 0;
-        setTimeLeft(config.epochDuration);
-      }
-
+      // Just keep the loop running for rendering, but logic is now driven by worker updates
       requestRef.current = requestAnimationFrame(animate);
     };
 
     if (isPlaying) {
-      lastFrameTimeRef.current = Date.now();
-      lastTimerUpdateRef.current = Date.now();
       requestRef.current = requestAnimationFrame(animate);
     } else {
       cancelAnimationFrame(requestRef.current);
@@ -181,7 +166,7 @@ function App() {
     return () => {
       cancelAnimationFrame(requestRef.current);
     };
-  }, [isPlaying, config.simulationSpeed, config.epochDuration, stepGeneration]);
+  }, [isPlaying]);
 
   const handleSpeedChange = () => {
     const speeds = [1, 2, 5, 10];
@@ -379,6 +364,7 @@ function App() {
                   simulationSpeed={config.simulationSpeed}
                   isPlaying={isPlaying}
                   generation={generation}
+                  onTimeUpdate={handleTimeUpdate}
                 />
 
                 {/* Hint overlay */}

@@ -12,6 +12,7 @@ interface WorldViewProps {
   simulationSpeed: number;
   isPlaying: boolean;
   generation: number;
+  onTimeUpdate?: (simTime: number) => void;
 }
 
 export const WorldView: React.FC<WorldViewProps> = ({
@@ -21,7 +22,8 @@ export const WorldView: React.FC<WorldViewProps> = ({
   onFitnessUpdate,
   simulationSpeed,
   isPlaying,
-  generation
+  generation,
+  onTimeUpdate
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -54,6 +56,7 @@ export const WorldView: React.FC<WorldViewProps> = ({
   const prevTargetPosRef = useRef<THREE.Vector3 | null>(null);
   const shouldSnapCameraRef = useRef(true);
   const lastFitnessReportRef = useRef(0);
+  const onTimeUpdateRef = useRef(onTimeUpdate);
 
   // Update refs
   useEffect(() => {
@@ -62,8 +65,10 @@ export const WorldView: React.FC<WorldViewProps> = ({
     }
     onSelectIdRef.current = onSelectId;
     selectedIdRef.current = selectedId;
+    selectedIdRef.current = selectedId;
     onFitnessUpdateRef.current = onFitnessUpdate;
-  }, [onSelectId, selectedId, onFitnessUpdate]);
+    onTimeUpdateRef.current = onTimeUpdate;
+  }, [onSelectId, selectedId, onFitnessUpdate, onTimeUpdate]);
 
   // 1. Initialize Worker (Once)
   useEffect(() => {
@@ -76,7 +81,12 @@ export const WorldView: React.FC<WorldViewProps> = ({
       if (type === 'READY') {
         setIsPhysicsReady(true);
       } else if (type === 'UPDATE') {
-        const { transforms, fitness } = payload;
+        const { transforms, fitness, simTime } = payload;
+
+        // Report simulation time
+        if (simTime !== undefined && onTimeUpdateRef.current) {
+          onTimeUpdateRef.current(simTime);
+        }
 
         // Apply transforms
         // transforms is a Float32Array: [x, y, z, qx, qy, qz, qw, ...]
