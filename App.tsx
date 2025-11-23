@@ -150,6 +150,8 @@ function App() {
     });
   }, [config.mutationRate]);
 
+  const hasTriggeredGeneration = useRef(false);
+
   // Simulation Time Handler
   const handleTimeUpdate = useCallback((simTime: number) => {
     // Update UI Timer
@@ -158,7 +160,12 @@ function App() {
 
     // Check Epoch End
     if (simTime >= config.epochDuration) {
-      stepGeneration();
+      if (!hasTriggeredGeneration.current) {
+        hasTriggeredGeneration.current = true;
+        stepGeneration();
+      }
+    } else {
+      hasTriggeredGeneration.current = false;
     }
   }, [config.epochDuration, stepGeneration]);
 
