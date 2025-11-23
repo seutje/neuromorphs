@@ -18,12 +18,12 @@ const INITIAL_CONFIG: SimulationConfig = {
   simulationSpeed: 10,
   epochDuration: 60, // Seconds
   task: 'LOCOMOTION',
-  seed: 42,
+  seed: Math.floor(Math.random() * 100000),
 };
 
 function App() {
   // Application State
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
   const [config, setConfig] = useState<SimulationConfig>(INITIAL_CONFIG);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'SIMULATION' | 'EDITOR'>('SIMULATION');
