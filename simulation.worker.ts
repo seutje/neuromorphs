@@ -190,16 +190,90 @@ function setupWorld(population: Individual[]) {
             }
         });
 
+        // Calculate Positions
+        const positions = new Map<number, { x: number, y: number, z: number }>();
+        const queue: number[] = [];
+
+        // Find roots
+        nodes.forEach(b => {
+            if (b.parentId === undefined) {
+                positions.set(b.id, { ...startPos });
+                queue.push(b.id);
+            }
+        });
+
+        // BFS Traversal to calculate positions
+        while (queue.length > 0) {
+            const parentId = queue.shift()!;
+            const parentPos = positions.get(parentId)!;
+            const parentBlock = nodes.find(n => n.id === parentId)!;
+            const children = parentToChildren.get(parentId) || [];
+
+            children.forEach(child => {
+                const siblings = children; // All children of this parent are siblings
+                const faceGroup = siblings.filter(s => s.attachFace === child.attachFace);
+                const indexInFace = faceGroup.findIndex(s => s.id === child.id);
+                const countInFace = faceGroup.length;
+
+                const face = child.attachFace;
+                const axisIdx = Math.floor(face / 2);
+                const dir = face % 2 === 0 ? 1 : -1;
+
+                const parentHalf = parentBlock.size[axisIdx] / 2;
+                const childHalf = child.size[axisIdx] / 2;
+
+                let spreadOffset = 0;
+                let spreadAxis = 0;
+
+                if (axisIdx === 0) spreadAxis = 2;
+                else if (axisIdx === 1) spreadAxis = 0;
+                else spreadAxis = 0;
+
+                if (countInFace > 1) {
+                    const parentDim = parentBlock.size[spreadAxis];
+                    const available = parentDim * 0.8;
+                    const t = indexInFace / (countInFace - 1);
+                    spreadOffset = (t - 0.5) * available;
+                }
+
+                // Calculate Anchors (a1 = parent, a2 = child)
+                // a1 is offset from parent center
+                let a1 = { x: 0, y: 0, z: 0 };
+                if (axisIdx === 0) a1.x = parentHalf * dir;
+                if (axisIdx === 1) a1.y = parentHalf * dir;
+                if (axisIdx === 2) a1.z = parentHalf * dir;
+
+                if (spreadAxis === 0) a1.x += spreadOffset;
+                if (spreadAxis === 1) a1.y += spreadOffset;
+                if (spreadAxis === 2) a1.z += spreadOffset;
+
+                // a2 is offset from child center
+                let a2 = { x: 0, y: 0, z: 0 };
+                if (axisIdx === 0) a2.x = -childHalf * dir;
+                if (axisIdx === 1) a2.y = -childHalf * dir;
+                if (axisIdx === 2) a2.z = -childHalf * dir;
+
+                // Child World Pos = Parent World Pos + a1 - a2
+                // (Assuming no rotation initially)
+                const childPos = {
+                    x: parentPos.x + a1.x - a2.x,
+                    y: parentPos.y + a1.y - a2.y,
+                    z: parentPos.z + a1.z - a2.z
+                };
+
+                positions.set(child.id, childPos);
+                queue.push(child.id);
+            });
+        }
+
         // Create Bodies
         nodes.forEach(block => {
+            const pos = positions.get(block.id) || startPos;
+
             const rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic();
             rigidBodyDesc.setLinearDamping(0.5);
             rigidBodyDesc.setAngularDamping(1.0);
-            rigidBodyDesc.setTranslation(
-                startPos.x + (block.parentId !== undefined ? 1 : 0) * (block.id * 0.5),
-                startPos.y + block.id * 0.2,
-                startPos.z
-            );
+            rigidBodyDesc.setTranslation(pos.x, pos.y, pos.z);
 
             const body = world!.createRigidBody(rigidBodyDesc);
 
