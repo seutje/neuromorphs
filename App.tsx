@@ -309,7 +309,7 @@ function App() {
           <Activity className="text-emerald-400 w-6 h-6" />
           <h1 className="text-xl font-bold tracking-tight text-white">
             Neuro<span className="text-emerald-400">Morphs</span>
-            <span className="text-xs ml-2 font-normal text-slate-500 px-2 py-0.5 border border-slate-800 rounded-full">v1.0.2</span>
+            <span className="text-xs ml-2 font-normal text-slate-500 px-2 py-0.5 border border-slate-800 rounded-full">v1.0.3</span>
           </h1>
         </div>
 
