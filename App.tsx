@@ -7,7 +7,9 @@ import { WorldView } from './components/WorldView';
 import { StatsPanel } from './components/StatsPanel';
 import { BrainVisualizer, MorphologyVisualizer } from './components/Visualizers';
 import { SettingsPane } from './components/SettingsPane';
-import { EditorView } from './components/EditorView';
+import { EditorCanvas } from './components/EditorCanvas';
+import { EditorPropertiesPanel } from './components/EditorPropertiesPanel';
+import { BlockNode, JointType } from './types';
 
 // Initial Config
 const INITIAL_CONFIG: SimulationConfig = {
@@ -30,6 +32,7 @@ function App() {
   const [generation, setGeneration] = useState(0);
   const [population, setPopulation] = useState<Individual[]>([]);
   const [editedGenome, setEditedGenome] = useState<Individual['genome'] | null>(null);
+  const [selectedBlockId, setSelectedBlockId] = useState<number | null>(null);
 
   // Tracking State
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -240,6 +243,47 @@ function App() {
     setViewMode('SIMULATION');
   };
 
+  // Editor Handlers
+  const handleUpdateBlock = (blockId: number, updates: Partial<BlockNode>) => {
+    if (!editedGenome) return;
+    const newMorphology = editedGenome.morphology.map(b =>
+      b.id === blockId ? { ...b, ...updates } : b
+    );
+    setEditedGenome({ ...editedGenome, morphology: newMorphology });
+  };
+
+  const handleAddChild = (parentId: number, face: number) => {
+    if (!editedGenome) return;
+    const newId = Math.max(...editedGenome.morphology.map(b => b.id)) + 1;
+    const newBlock: BlockNode = {
+      id: newId,
+      size: [1, 1, 1],
+      color: '#34d399', // Emerald-400 default
+      parentId: parentId,
+      attachFace: face,
+      jointType: JointType.REVOLUTE,
+      jointParams: { speed: 5, phase: 0, amp: 1.0 }
+    };
+
+    setEditedGenome({ ...editedGenome, morphology: [...editedGenome.morphology, newBlock] });
+    setSelectedBlockId(newId);
+  };
+
+  const handleDeleteBlock = (blockId: number) => {
+    if (!editedGenome) return;
+    // Recursive delete
+    const toDelete = new Set<number>();
+    const findChildren = (id: number) => {
+      toDelete.add(id);
+      editedGenome.morphology.filter(b => b.parentId === id).forEach(child => findChildren(child.id));
+    };
+    findChildren(blockId);
+
+    const newMorphology = editedGenome.morphology.filter(b => !toDelete.has(b.id));
+    setEditedGenome({ ...editedGenome, morphology: newMorphology });
+    setSelectedBlockId(null);
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-emerald-500/30">
 
@@ -367,10 +411,10 @@ function App() {
               </>
             ) : (
               editedGenome && (
-                <EditorView
+                <EditorCanvas
                   genome={editedGenome}
-                  onUpdateGenome={setEditedGenome}
-                  onStartSimulation={handleStartSimulationFromEditor}
+                  selectedBlockId={selectedBlockId}
+                  onSelectBlock={setSelectedBlockId}
                 />
               )
             )}
@@ -385,96 +429,111 @@ function App() {
         {/* Right Column: Inspectors (4 cols) */}
         <div className="lg:col-span-4 flex flex-col gap-4 h-full overflow-y-auto pr-2 custom-scrollbar">
 
-          {/* Selected Creature Card */}
-          <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h2 className="text-slate-100 font-semibold flex items-center gap-2">
-                  {selectedIndividual?.id === bestIndividual?.id && <Trophy className="w-4 h-4 text-yellow-500" />}
-                  {selectedIndividual?.id === bestIndividual?.id ? 'Dominant Species' : 'Selected Specimen'}
-                </h2>
-                <p className="text-slate-500 text-xs font-mono mt-1">
-                  ID: {selectedIndividual?.id || 'PENDING...'}
-                </p>
-              </div>
-              {selectedIndividual && (
-                <span className={`text-xs px-2 py-1 rounded border font-mono ${selectedIndividual.id === bestIndividual?.id
-                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                  : 'bg-slate-800 text-slate-400 border-slate-700'
-                  }`}>
-                  {selectedIndividual.id === bestIndividual?.id ? 'Leader' : 'Tracking'}
-                </span>
-              )}
+          {/* Selected Creature Card OR Editor Properties */}
+          {viewMode === 'EDITOR' && editedGenome ? (
+            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg flex-1 overflow-hidden">
+              <EditorPropertiesPanel
+                genome={editedGenome}
+                selectedBlockId={selectedBlockId}
+                onUpdateBlock={handleUpdateBlock}
+                onAddChild={handleAddChild}
+                onDeleteBlock={handleDeleteBlock}
+                onStartSimulation={handleStartSimulationFromEditor}
+              />
             </div>
+          ) : (
+            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h2 className="text-slate-100 font-semibold flex items-center gap-2">
+                    {selectedIndividual?.id === bestIndividual?.id && <Trophy className="w-4 h-4 text-yellow-500" />}
+                    {selectedIndividual?.id === bestIndividual?.id ? 'Dominant Species' : 'Selected Specimen'}
+                  </h2>
+                  <p className="text-slate-500 text-xs font-mono mt-1">
+                    ID: {selectedIndividual?.id || 'PENDING...'}
+                  </p>
+                </div>
+                {selectedIndividual && (
+                  <span className={`text-xs px-2 py-1 rounded border font-mono ${selectedIndividual.id === bestIndividual?.id
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                    : 'bg-slate-800 text-slate-400 border-slate-700'
+                    }`}>
+                    {selectedIndividual.id === bestIndividual?.id ? 'Leader' : 'Tracking'}
+                  </span>
+                )}
+              </div>
 
-            {/* Inspectors */}
-            {selectedIndividual && (
-              <div className="space-y-4">
-                <MorphologyVisualizer genome={selectedIndividual.genome} />
-                <BrainVisualizer genome={selectedIndividual.genome} active={isPlaying} />
+              {/* Inspectors */}
+              {selectedIndividual && (
+                <div className="space-y-4">
+                  <MorphologyVisualizer genome={selectedIndividual.genome} />
+                  <BrainVisualizer genome={selectedIndividual.genome} active={isPlaying} />
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-slate-950 p-3 rounded border border-slate-800">
-                    <div className="text-[10px] uppercase text-slate-500 font-bold">Block Count</div>
-                    <div className="text-xl text-white font-mono">{selectedIndividual.genome.morphology.length}</div>
-                  </div>
-                  <div className="bg-slate-950 p-3 rounded border border-slate-800">
-                    <div className="text-[10px] uppercase text-slate-500 font-bold">Brain Size</div>
-                    <div className="text-xl text-white font-mono">
-                      {selectedIndividual.genome.brain.nodes.length}N / {selectedIndividual.genome.brain.connections.length}C
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-slate-950 p-3 rounded border border-slate-800">
+                      <div className="text-[10px] uppercase text-slate-500 font-bold">Block Count</div>
+                      <div className="text-xl text-white font-mono">{selectedIndividual.genome.morphology.length}</div>
                     </div>
-                  </div>
-                  <div className="col-span-2 bg-slate-950 p-3 rounded border border-slate-800">
-                    <div className="text-[10px] uppercase text-slate-500 font-bold">Current Fitness</div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-xl text-white font-mono transition-all">{selectedIndividual.fitness.toFixed(2)}</span>
-                      <span className="text-xs text-slate-500">meters</span>
+                    <div className="bg-slate-950 p-3 rounded border border-slate-800">
+                      <div className="text-[10px] uppercase text-slate-500 font-bold">Brain Size</div>
+                      <div className="text-xl text-white font-mono">
+                        {selectedIndividual.genome.brain.nodes.length}N / {selectedIndividual.genome.brain.connections.length}C
+                      </div>
+                    </div>
+                    <div className="col-span-2 bg-slate-950 p-3 rounded border border-slate-800">
+                      <div className="text-[10px] uppercase text-slate-500 font-bold">Current Fitness</div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-xl text-white font-mono transition-all">{selectedIndividual.fitness.toFixed(2)}</span>
+                        <span className="text-xs text-slate-500">meters</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {!selectedIndividual && (
-              <div className="h-48 flex items-center justify-center text-slate-600 text-sm">
-                Initialize simulation to view data
-              </div>
-            )}
-          </div>
+              {!selectedIndividual && (
+                <div className="h-48 flex items-center justify-center text-slate-600 text-sm">
+                  Initialize simulation to view data
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Leaderboard / Previous Runs */}
-          <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 flex-1 min-h-[200px]">
-            <h3 className="text-sm font-semibold text-slate-200 uppercase tracking-wider mb-4">
-              Leaderboard (Live)
-            </h3>
-            <div className="space-y-2">
-              {[...population]
-                .sort((a, b) => b.fitness - a.fitness)
-                .slice(0, 3)
-                .map((ind, rank) => (
-                  <div
-                    key={ind.id}
-                    onClick={() => handleCreatureSelect(ind.id)}
-                    className={`flex items-center justify-between p-2 rounded border transition-colors cursor-pointer group ${ind.id === selectedId ? 'bg-slate-800 border-slate-600' : 'bg-slate-950/50 border-slate-800/50 hover:border-slate-700'
-                      }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className={`font-mono text-xs w-6 h-6 flex items-center justify-center rounded-full ${rank === 0 ? 'bg-yellow-500/20 text-yellow-500' : 'bg-slate-800 text-slate-400'}`}>
-                        #{rank + 1}
-                      </span>
-                      <div className="flex flex-col">
-                        <span className="text-xs text-slate-300 font-mono group-hover:text-emerald-400 transition-colors truncate w-24">
-                          {ind.id}
+          {viewMode === 'SIMULATION' && (
+            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 flex-1 min-h-[200px]">
+              <h3 className="text-sm font-semibold text-slate-200 uppercase tracking-wider mb-4">
+                Leaderboard (Live)
+              </h3>
+              <div className="space-y-2">
+                {[...population]
+                  .sort((a, b) => b.fitness - a.fitness)
+                  .slice(0, 3)
+                  .map((ind, rank) => (
+                    <div
+                      key={ind.id}
+                      onClick={() => handleCreatureSelect(ind.id)}
+                      className={`flex items-center justify-between p-2 rounded border transition-colors cursor-pointer group ${ind.id === selectedId ? 'bg-slate-800 border-slate-600' : 'bg-slate-950/50 border-slate-800/50 hover:border-slate-700'
+                        }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`font-mono text-xs w-6 h-6 flex items-center justify-center rounded-full ${rank === 0 ? 'bg-yellow-500/20 text-yellow-500' : 'bg-slate-800 text-slate-400'}`}>
+                          #{rank + 1}
                         </span>
+                        <div className="flex flex-col">
+                          <span className="text-xs text-slate-300 font-mono group-hover:text-emerald-400 transition-colors truncate w-24">
+                            {ind.id}
+                          </span>
+                        </div>
                       </div>
+                      <span className="font-mono text-sm text-emerald-500">
+                        {ind.fitness.toFixed(2)}m
+                      </span>
                     </div>
-                    <span className="font-mono text-sm text-emerald-500">
-                      {ind.fitness.toFixed(2)}m
-                    </span>
-                  </div>
-                ))}
+                  ))}
+              </div>
             </div>
-          </div>
+          )}
 
         </div>
       </main>
