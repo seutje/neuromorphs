@@ -260,14 +260,14 @@ export const mutateGenome = (genome: Genome, rate: number) => {
           block.childOffset[0] = Math.max(-childLimitU, Math.min(childLimitU, block.childOffset[0]));
           block.childOffset[1] = Math.max(-childLimitV, Math.min(childLimitV, block.childOffset[1]));
         }
+      }
 
-        // Mutate rotation
-        if (random() < rate * 0.5) {
-          const rotation = block.rotation || [0, 0, 0];
-          const axisToNudge = Math.floor(random() * 3);
-          rotation[axisToNudge] += (random() * 20) - 10; // +/-10 degrees
-          block.rotation = rotation.map(r => Math.max(-180, Math.min(180, r))) as [number, number, number];
-        }
+      // Mutate Rotation
+      if (block.parentId !== undefined && random() < rate) {
+        const rotation = block.rotation || [0, 0, 0];
+        const axisToNudge = Math.floor(random() * 3);
+        rotation[axisToNudge] += (random() * 20) - 10; // +/-10 degrees
+        block.rotation = rotation.map(r => Math.max(-180, Math.min(180, r))) as [number, number, number];
       }
     }
   });
