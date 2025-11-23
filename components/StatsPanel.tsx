@@ -7,6 +7,12 @@ interface StatsPanelProps {
 }
 
 export const StatsPanel: React.FC<StatsPanelProps> = ({ history }) => {
+  const processedHistory = React.useMemo(() => history.map(stat => ({
+    ...stat,
+    maxFitness: Math.max(0, stat.maxFitness || 0),
+    avgFitness: Math.max(0, stat.avgFitness || 0)
+  })), [history]);
+
   return (
     <div className="h-full flex flex-col">
       <div className="flex justify-between items-center mb-4">
@@ -22,38 +28,38 @@ export const StatsPanel: React.FC<StatsPanelProps> = ({ history }) => {
           </div>
         </div>
       </div>
-      
+
       <div className="flex-1 min-h-[150px]">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={history}>
+          <LineChart data={processedHistory}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-            <XAxis 
-              dataKey="generation" 
-              stroke="#64748b" 
+            <XAxis
+              dataKey="generation"
+              stroke="#64748b"
               fontSize={12}
               tickLine={false}
             />
-            <YAxis 
-              stroke="#64748b" 
+            <YAxis
+              stroke="#64748b"
               fontSize={12}
               tickLine={false}
             />
-            <Tooltip 
+            <Tooltip
               contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155' }}
               itemStyle={{ fontSize: '12px' }}
             />
-            <Line 
-              type="monotone" 
-              dataKey="maxFitness" 
-              stroke="#34d399" 
-              strokeWidth={2} 
+            <Line
+              type="monotone"
+              dataKey="maxFitness"
+              stroke="#34d399"
+              strokeWidth={2}
               dot={false}
             />
-            <Line 
-              type="monotone" 
-              dataKey="avgFitness" 
-              stroke="#818cf8" 
-              strokeWidth={2} 
+            <Line
+              type="monotone"
+              dataKey="avgFitness"
+              stroke="#818cf8"
+              strokeWidth={2}
               dot={false}
             />
           </LineChart>
