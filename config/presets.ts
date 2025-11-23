@@ -35,10 +35,10 @@ export const PRESETS: { name: string; genome: Genome }[] = [
             morphology: [
                 { id: 0, size: [1, 0.5, 1.5], color: '#3b82f6', attachFace: 0, jointParams: { speed: 0, phase: 0, amp: 0 } },
                 // Legs
-                { id: 1, size: [0.25, 1, 0.25], color: '#3b82f6', parentId: 0, attachFace: 2, jointType: JointType.REVOLUTE, jointParams: { speed: 5, phase: 0, amp: 1 } }, // Front Left
-                { id: 2, size: [0.25, 1, 0.25], color: '#3b82f6', parentId: 0, attachFace: 3, jointType: JointType.REVOLUTE, jointParams: { speed: 5, phase: 3.14, amp: 1 } }, // Front Right
-                { id: 3, size: [0.25, 1, 0.25], color: '#3b82f6', parentId: 0, attachFace: 4, jointType: JointType.REVOLUTE, jointParams: { speed: 5, phase: 3.14, amp: 1 } }, // Back Left
-                { id: 4, size: [0.25, 1, 0.25], color: '#3b82f6', parentId: 0, attachFace: 5, jointType: JointType.REVOLUTE, jointParams: { speed: 5, phase: 0, amp: 1 } }  // Back Right
+                { id: 1, size: [0.25, 1, 0.25], color: '#3b82f6', parentId: 0, attachFace: 3, parentOffset: [0.1, 0.5], jointType: JointType.REVOLUTE, jointParams: { speed: 5, phase: 0, amp: 1 } }, // Front Left
+                { id: 2, size: [0.25, 1, 0.25], color: '#3b82f6', parentId: 0, attachFace: 3, parentOffset: [0.5, 0.5], jointType: JointType.REVOLUTE, jointParams: { speed: 5, phase: 3.14, amp: 1 } }, // Front Right
+                { id: 3, size: [0.25, 1, 0.25], color: '#3b82f6', parentId: 0, attachFace: 3, parentOffset: [-0.5, -0.5], jointType: JointType.REVOLUTE, jointParams: { speed: 5, phase: 3.14, amp: 1 } }, // Back Left
+                { id: 4, size: [0.25, 1, 0.25], color: '#3b82f6', parentId: 0, attachFace: 3, parentOffset: [0, -0.5], jointType: JointType.REVOLUTE, jointParams: { speed: 5, phase: 0, amp: 1 } }  // Back Right
             ],
             brain: {
                 nodes: [
@@ -62,8 +62,8 @@ export const PRESETS: { name: string; genome: Genome }[] = [
         genome: {
             morphology: [
                 { id: 0, size: [0.75, 1, 0.5], color: '#eab308', attachFace: 0, jointParams: { speed: 0, phase: 0, amp: 0 } },
-                { id: 1, size: [0.25, 1, 0.25], color: '#eab308', parentId: 0, attachFace: 3, jointType: JointType.REVOLUTE, jointParams: { speed: 3, phase: 0, amp: 0.8 } },
-                { id: 2, size: [0.25, 1, 0.25], color: '#eab308', parentId: 0, attachFace: 3, jointType: JointType.REVOLUTE, jointParams: { speed: 3, phase: 3.14, amp: 0.8 } }
+                { id: 1, size: [0.25, 1, 0.25], color: '#eab308', parentId: 0, attachFace: 3, parentOffset: [0, 0], jointType: JointType.REVOLUTE, jointParams: { speed: 3, phase: 0, amp: 0.8 } },
+                { id: 2, size: [0.25, 1, 0.25], color: '#eab308', parentId: 0, attachFace: 3, parentOffset: [0, 0], jointType: JointType.REVOLUTE, jointParams: { speed: 3, phase: 3.14, amp: 0.8 } }
             ],
             brain: {
                 nodes: [
