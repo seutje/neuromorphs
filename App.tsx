@@ -207,6 +207,12 @@ function App() {
           </h1>
         </div>
 
+        <div className="flex items-center gap-3">
+          <h2 className="text-md font-bold tracking-tight text-white">
+            Inspired by <a href="https://www.karlsims.com/evolved-virtual-creatures.html" target="_blank" className="text-emerald-400">Karl Sims</a>
+          </h2>
+        </div>
+
         <div className="flex items-center gap-4">
           <div className="hidden md:flex items-center gap-6 mr-8 text-sm font-mono text-slate-400">
             <div className="flex flex-col items-end">
