@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, Pause, FastForward, RefreshCw, Settings, Share2, Trophy, Activity, MousePointer2 } from 'lucide-react';
+import { Play, Pause, FastForward, RefreshCw, Settings, Share2, Trophy, Activity, MousePointer2, PenTool } from 'lucide-react';
 import { Individual, GenerationStats, SimulationConfig } from './types';
 import { generateIndividual, evolvePopulation, setSeed } from './services/genetics';
 import { WorldView } from './components/WorldView';
 import { StatsPanel } from './components/StatsPanel';
 import { BrainVisualizer, MorphologyVisualizer } from './components/Visualizers';
 import { SettingsPane } from './components/SettingsPane';
+import { EditorView } from './components/EditorView';
 
 // Initial Config
 const INITIAL_CONFIG: SimulationConfig = {
@@ -23,10 +24,12 @@ function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [config, setConfig] = useState<SimulationConfig>(INITIAL_CONFIG);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'SIMULATION' | 'EDITOR'>('SIMULATION');
 
   // Simulation Data
   const [generation, setGeneration] = useState(0);
   const [population, setPopulation] = useState<Individual[]>([]);
+  const [editedGenome, setEditedGenome] = useState<Individual['genome'] | null>(null);
 
   // Tracking State
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -187,6 +190,56 @@ function App() {
     setSelectedId(id);
   };
 
+  const handleEnterEditor = () => {
+    setIsPlaying(false);
+    // If we have a selected creature, edit that one, otherwise use the best, or generate a new one
+    const template = selectedIndividual || bestIndividual || population[0];
+    if (template) {
+      // Deep clone to avoid mutating simulation state directly
+      setEditedGenome(JSON.parse(JSON.stringify(template.genome)));
+    } else {
+      // Fallback if population is empty (shouldn't happen usually)
+      setEditedGenome(generateIndividual(0, 0).genome);
+    }
+    setViewMode('EDITOR');
+  };
+
+  const handleStartSimulationFromEditor = () => {
+    if (!editedGenome) return;
+
+    // Create a config for the new run
+    const runConfig = { ...config, seed: Math.floor(Math.random() * 10000) }; // New seed for variety
+
+    // Custom start run logic for edited creature
+    setSeed(runConfig.seed);
+
+    const initialPop: Individual[] = [];
+    for (let i = 0; i < runConfig.populationSize; i++) {
+      // Create individuals based on the edited genome
+      // We can add slight mutations here if we want diversity, or keep them identical
+      const ind = generateIndividual(0, i);
+      ind.genome = JSON.parse(JSON.stringify(editedGenome)); // Clone the edited genome
+      // Optionally mutate slightly:
+      // mutate(ind.genome, config.mutationRate); 
+      initialPop.push(ind);
+    }
+
+    setPopulation(initialPop);
+    setBestIndividual(initialPop[0]);
+    setSelectedId(initialPop[0].id);
+    setGeneration(0);
+    setHistory([]);
+    setTimeLeft(runConfig.epochDuration);
+
+    // Reset Refs
+    generationCounterRef.current = 0;
+    lastFrameTimeRef.current = Date.now();
+    epochTimeAccumulatorRef.current = 0;
+    lastTimerUpdateRef.current = Date.now();
+
+    setViewMode('SIMULATION');
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-emerald-500/30">
 
@@ -238,6 +291,14 @@ function App() {
           </div>
 
           <button
+            onClick={handleEnterEditor}
+            className={`p-2 hover:bg-slate-800 rounded-full transition-colors ${viewMode === 'EDITOR' ? 'text-emerald-400 bg-slate-800' : 'text-slate-400 hover:text-white'}`}
+            title="Creature Editor"
+          >
+            <PenTool className="w-5 h-5" />
+          </button>
+
+          <button
             onClick={() => setIsSettingsOpen(true)}
             className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"
             title="Simulation Settings"
@@ -255,52 +316,64 @@ function App() {
 
           {/* 3D Viewport Container */}
           <div className="flex-1 min-h-[400px] bg-slate-900 rounded-xl border border-slate-800 relative flex flex-col group">
-            <WorldView
-              population={population}
-              selectedId={selectedId}
-              onSelectId={handleCreatureSelect}
-              onFitnessUpdate={handleFitnessUpdate}
-              simulationSpeed={config.simulationSpeed}
-              isPlaying={isPlaying}
-              generation={generation}
-            />
+            {viewMode === 'SIMULATION' ? (
+              <>
+                <WorldView
+                  population={population}
+                  selectedId={selectedId}
+                  onSelectId={handleCreatureSelect}
+                  onFitnessUpdate={handleFitnessUpdate}
+                  simulationSpeed={config.simulationSpeed}
+                  isPlaying={isPlaying}
+                  generation={generation}
+                />
 
-            {/* Hint overlay */}
-            <div className="absolute top-4 left-4 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
-              <div className="bg-slate-950/50 backdrop-blur text-xs text-slate-400 px-2 py-1 rounded border border-slate-800 flex items-center gap-2">
-                <MousePointer2 className="w-3 h-3" />
-                <span>Click creature to track • Drag to rotate • Scroll to zoom</span>
-              </div>
-            </div>
+                {/* Hint overlay */}
+                <div className="absolute top-4 left-4 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="bg-slate-950/50 backdrop-blur text-xs text-slate-400 px-2 py-1 rounded border border-slate-800 flex items-center gap-2">
+                    <MousePointer2 className="w-3 h-3" />
+                    <span>Click creature to track • Drag to rotate • Scroll to zoom</span>
+                  </div>
+                </div>
 
-            {/* Playback Controls Overlay */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-slate-950/90 border border-slate-700 rounded-full px-6 py-3 flex items-center gap-6 shadow-2xl backdrop-blur-md z-20">
-              <button
-                onClick={() => {
-                  startRun(config);
-                  setIsPlaying(false);
-                }}
-                className="text-slate-400 hover:text-white transition-transform hover:scale-110"
-                title="Reset"
-              >
-                <RefreshCw className="w-5 h-5" />
-              </button>
+                {/* Playback Controls Overlay */}
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-slate-950/90 border border-slate-700 rounded-full px-6 py-3 flex items-center gap-6 shadow-2xl backdrop-blur-md z-20">
+                  <button
+                    onClick={() => {
+                      startRun(config);
+                      setIsPlaying(false);
+                    }}
+                    className="text-slate-400 hover:text-white transition-transform hover:scale-110"
+                    title="Reset"
+                  >
+                    <RefreshCw className="w-5 h-5" />
+                  </button>
 
-              <button
-                onClick={() => setIsPlaying(!isPlaying)}
-                className="bg-white text-slate-950 w-12 h-12 rounded-full flex items-center justify-center hover:bg-emerald-400 transition-all shadow-lg hover:shadow-emerald-500/50"
-              >
-                {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-1" />}
-              </button>
+                  <button
+                    onClick={() => setIsPlaying(!isPlaying)}
+                    className="bg-white text-slate-950 w-12 h-12 rounded-full flex items-center justify-center hover:bg-emerald-400 transition-all shadow-lg hover:shadow-emerald-500/50"
+                  >
+                    {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-1" />}
+                  </button>
 
-              <button
-                onClick={handleSpeedChange}
-                className="text-slate-400 hover:text-white flex items-center gap-1 font-mono text-sm font-bold w-12"
-              >
-                <FastForward className="w-4 h-4" />
-                {config.simulationSpeed}x
-              </button>
-            </div>
+                  <button
+                    onClick={handleSpeedChange}
+                    className="text-slate-400 hover:text-white flex items-center gap-1 font-mono text-sm font-bold w-12"
+                  >
+                    <FastForward className="w-4 h-4" />
+                    {config.simulationSpeed}x
+                  </button>
+                </div>
+              </>
+            ) : (
+              editedGenome && (
+                <EditorView
+                  genome={editedGenome}
+                  onUpdateGenome={setEditedGenome}
+                  onStartSimulation={handleStartSimulationFromEditor}
+                />
+              )
+            )}
           </div>
 
           {/* Charts Panel */}
