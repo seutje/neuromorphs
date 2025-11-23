@@ -1,9 +1,8 @@
-
 import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import RAPIER from '@dimforge/rapier3d-compat';
-import { Individual, BlockNode, JointType, NodeType, Genome, NeuralConnection } from '../types';
+import { Individual } from '../types';
+import SimulationWorker from '../simulation.worker?worker';
 
 interface WorldViewProps {
   population: Individual[];
@@ -13,31 +12,6 @@ interface WorldViewProps {
   simulationSpeed: number;
   isPlaying: boolean;
   generation: number;
-}
-
-interface PhysObject {
-  mesh: THREE.Mesh;
-  body: RAPIER.RigidBody;
-  id: string; // individual ID
-  blockId: number; // specific block ID to identify root
-}
-
-interface PhysJoint {
-  joint: RAPIER.ImpulseJoint;
-  motorType: JointType;
-  phase: number;
-  speed: number;
-  amp: number;
-  body: RAPIER.RigidBody;
-  parentBody: RAPIER.RigidBody;
-  blockId: number;
-  individualId: string;
-}
-
-interface BrainInstance {
-  genome: Genome;
-  activations: Record<string, number>;
-  connectionsByTarget: Map<string, NeuralConnection[]>;
 }
 
 export const WorldView: React.FC<WorldViewProps> = ({
@@ -56,21 +30,17 @@ export const WorldView: React.FC<WorldViewProps> = ({
   const controlsRef = useRef<OrbitControls | null>(null);
   const dirLightRef = useRef<THREE.DirectionalLight | null>(null);
 
-  // Environment Refs (for resizing)
+  // Environment Refs
   const groundMeshRef = useRef<THREE.Mesh | null>(null);
   const gridHelperRef = useRef<THREE.GridHelper | null>(null);
   const startLineRef = useRef<THREE.Mesh | null>(null);
   const markersGroupRef = useRef<THREE.Group | null>(null);
 
-  // Physics World State
-  const worldRef = useRef<RAPIER.World | null>(null);
-  const physObjectsRef = useRef<PhysObject[]>([]);
-  const physJointsRef = useRef<PhysJoint[]>([]);
-  const disqualifiedRef = useRef<Set<string>>(new Set());
-  const brainStatesRef = useRef<Map<string, BrainInstance>>(new Map());
-  const rootBodiesRef = useRef<Map<string, RAPIER.RigidBody>>(new Map());
+  // Worker & State
+  const workerRef = useRef<Worker | null>(null);
+  const meshMapRef = useRef<THREE.Mesh[]>([]); // Flat list of meshes matching worker order
+  const idMapRef = useRef<Map<string, THREE.Mesh>>(new Map()); // Map for camera follow (id -> root mesh)
 
-  const requestRef = useRef<number>(0);
   const raycasterRef = useRef<THREE.Raycaster>(new THREE.Raycaster());
   const mouseRef = useRef<THREE.Vector2>(new THREE.Vector2());
   const [isPhysicsReady, setIsPhysicsReady] = useState(false);
@@ -83,71 +53,6 @@ export const WorldView: React.FC<WorldViewProps> = ({
   const shouldSnapCameraRef = useRef(true);
   const lastFitnessReportRef = useRef(0);
 
-  // Simulation time accumulator
-  const simTimeRef = useRef(0);
-
-  const buildBrainInstance = (genome: Genome): BrainInstance => {
-    const activations: Record<string, number> = {};
-    const connectionsByTarget = new Map<string, NeuralConnection[]>();
-
-    genome.brain.nodes.forEach(node => {
-      activations[node.id] = node.activation || 0;
-    });
-
-    genome.brain.connections.forEach(conn => {
-      const list = connectionsByTarget.get(conn.target) || [];
-      list.push(conn);
-      connectionsByTarget.set(conn.target, list);
-    });
-
-    return { genome, activations, connectionsByTarget };
-  };
-
-  const updateBrainActivations = (time: number, jointsByCreature: Map<string, PhysJoint[]>) => {
-    jointsByCreature.forEach((joints, creatureId) => {
-      const brain = brainStatesRef.current.get(creatureId);
-      const rootBody = rootBodiesRef.current.get(creatureId);
-
-      if (!brain || !rootBody || !rootBody.isValid()) return;
-
-      const linvel = rootBody.linvel();
-      const translation = rootBody.translation();
-
-      const groundSensor = translation.y < 0.55 ? 1 : -1;
-      const velocitySensor = Math.tanh(linvel.x / 5);
-      const motionSensor = joints.length > 0
-        ? Math.tanh((Math.abs(joints[0].body.angvel().x) + Math.abs(joints[0].body.angvel().y) + Math.abs(joints[0].body.angvel().z)) / 6)
-        : 0;
-
-      const newActivations: Record<string, number> = {};
-      const previousActivations = brain.activations;
-
-      brain.genome.brain.nodes.forEach(node => {
-        switch (node.type) {
-          case NodeType.SENSOR: {
-            if (node.id === 's1') newActivations[node.id] = groundSensor;
-            else if (node.id === 's2') newActivations[node.id] = motionSensor;
-            else if (node.id === 's3') newActivations[node.id] = velocitySensor;
-            else newActivations[node.id] = 0;
-            break;
-          }
-          case NodeType.OSCILLATOR: {
-            newActivations[node.id] = Math.sin(time * 2 + node.y * 10);
-            break;
-          }
-          default: {
-            const inputs = brain.connectionsByTarget.get(node.id) || [];
-            const sum = inputs.reduce((acc, conn) => acc + (previousActivations[conn.source] ?? 0) * conn.weight, 0);
-            newActivations[node.id] = Math.tanh(sum);
-            break;
-          }
-        }
-      });
-
-      brain.activations = newActivations;
-    });
-  };
-
   // Update refs
   useEffect(() => {
     if (selectedId !== selectedIdRef.current) {
@@ -158,16 +63,67 @@ export const WorldView: React.FC<WorldViewProps> = ({
     onFitnessUpdateRef.current = onFitnessUpdate;
   }, [onSelectId, selectedId, onFitnessUpdate]);
 
-  // 1. Initialize Rapier (Once)
+  // 1. Initialize Worker (Once)
   useEffect(() => {
-    const initPhysics = async () => {
-      await RAPIER.init();
-      setIsPhysicsReady(true);
+    const worker = new SimulationWorker();
+    workerRef.current = worker;
+
+    worker.onmessage = (e) => {
+      const { type, payload } = e.data;
+
+      if (type === 'READY') {
+        setIsPhysicsReady(true);
+      } else if (type === 'UPDATE') {
+        const { transforms, fitness } = payload;
+
+        // Apply transforms
+        // transforms is a Float32Array: [x, y, z, qx, qy, qz, qw, ...]
+        const meshes = meshMapRef.current;
+        if (meshes.length * 7 === transforms.length) {
+          for (let i = 0; i < meshes.length; i++) {
+            const offset = i * 7;
+            const mesh = meshes[i];
+
+            mesh.position.set(
+              transforms[offset],
+              transforms[offset + 1],
+              transforms[offset + 2]
+            );
+            mesh.quaternion.set(
+              transforms[offset + 3],
+              transforms[offset + 4],
+              transforms[offset + 5],
+              transforms[offset + 6]
+            );
+
+            // Simple visibility check (if it fell too far or is invalid, it might be at 0,-100,0)
+            // But we let the worker handle logic, we just render.
+            // We can hide if y < -50 maybe?
+            if (transforms[offset + 1] < -50) {
+              mesh.visible = false;
+            } else {
+              mesh.visible = true;
+            }
+          }
+        }
+
+        // Report fitness
+        const now = performance.now();
+        if (now - lastFitnessReportRef.current > 50) {
+          onFitnessUpdateRef.current(fitness);
+          lastFitnessReportRef.current = now;
+        }
+      }
     };
-    initPhysics();
+
+    worker.postMessage({ type: 'INIT' });
+
+    return () => {
+      worker.terminate();
+    };
   }, []);
 
-  // 2. Initialize Three.js Scene (Once - Static elements)
+  // 2. Initialize Three.js Scene
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -197,7 +153,6 @@ export const WorldView: React.FC<WorldViewProps> = ({
     controls.maxDistance = 100;
     controlsRef.current = controls;
 
-    // Lights
     const ambientLight = new THREE.HemisphereLight(0xffffff, 0x020617, 0.6);
     scene.add(ambientLight);
 
@@ -206,7 +161,6 @@ export const WorldView: React.FC<WorldViewProps> = ({
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.set(2048, 2048);
     dirLight.shadow.bias = -0.001;
-    // Shadow frustum will be updated dynamically
     scene.add(dirLight);
     dirLightRef.current = dirLight;
 
@@ -228,7 +182,46 @@ export const WorldView: React.FC<WorldViewProps> = ({
     };
     renderer.domElement.addEventListener('click', onMouseClick);
 
+    // Render Loop
+    let reqId = 0;
+    const animate = () => {
+      reqId = requestAnimationFrame(animate);
+      if (controlsRef.current) controlsRef.current.update();
+
+      // Camera Follow
+      const currentSelectedId = selectedIdRef.current;
+      let targetPos: THREE.Vector3 | null = null;
+
+      if (currentSelectedId) {
+        const targetMesh = idMapRef.current.get(currentSelectedId);
+        if (targetMesh) {
+          targetPos = targetMesh.position.clone();
+        }
+      }
+
+      if (targetPos) {
+        if (shouldSnapCameraRef.current) {
+          const offset = cameraRef.current!.position.clone().sub(controlsRef.current!.target);
+          controlsRef.current!.target.copy(targetPos);
+          cameraRef.current!.position.copy(targetPos).add(offset);
+          shouldSnapCameraRef.current = false;
+          prevTargetPosRef.current = targetPos;
+        } else if (prevTargetPosRef.current) {
+          const delta = targetPos.clone().sub(prevTargetPosRef.current);
+          cameraRef.current!.position.add(delta);
+          controlsRef.current!.target.add(delta);
+          prevTargetPosRef.current = targetPos;
+        }
+      }
+
+      if (rendererRef.current && sceneRef.current && cameraRef.current) {
+        rendererRef.current.render(sceneRef.current, cameraRef.current);
+      }
+    };
+    animate();
+
     return () => {
+      cancelAnimationFrame(reqId);
       renderer.domElement.removeEventListener('click', onMouseClick);
       if (rendererRef.current && container) {
         container.removeChild(rendererRef.current.domElement);
@@ -237,20 +230,16 @@ export const WorldView: React.FC<WorldViewProps> = ({
     };
   }, []);
 
-  // 3. Rebuild Physics World & Population & Environment Size
+  // 3. Sync Population & Environment
   useEffect(() => {
-    if (!isPhysicsReady || !sceneRef.current) return;
+    if (!sceneRef.current || !workerRef.current || !isPhysicsReady) return;
 
-    // --- CALCULATE DYNAMIC SCENE DIMENSIONS ---
+    // --- Environment ---
     const laneWidth = 3.0;
-    const trackLength = 2000; // X-Axis
-    // Dynamic Z-depth based on population to prevent spawn-in-void
+    const trackLength = 2000;
     const requiredDepth = Math.max(1000, population.length * laneWidth * 1.2);
-    const groundHalfDepth = requiredDepth / 2.0;
 
-    // --- UPDATE VISUAL ENVIRONMENT ---
-
-    // 1. Ground Plane
+    // Ground
     if (groundMeshRef.current) {
       groundMeshRef.current.geometry.dispose();
       groundMeshRef.current.geometry = new THREE.PlaneGeometry(trackLength, requiredDepth);
@@ -264,7 +253,7 @@ export const WorldView: React.FC<WorldViewProps> = ({
       groundMeshRef.current = plane;
     }
 
-    // 2. Grid Helper
+    // Grid
     if (gridHelperRef.current) {
       sceneRef.current.remove(gridHelperRef.current);
       gridHelperRef.current.geometry.dispose();
@@ -274,7 +263,7 @@ export const WorldView: React.FC<WorldViewProps> = ({
     sceneRef.current.add(grid);
     gridHelperRef.current = grid;
 
-    // 3. Start Line
+    // Start Line
     if (startLineRef.current) {
       startLineRef.current.geometry.dispose();
       startLineRef.current.geometry = new THREE.BoxGeometry(0.2, 0.05, requiredDepth);
@@ -286,15 +275,13 @@ export const WorldView: React.FC<WorldViewProps> = ({
       startLineRef.current = startLine;
     }
 
-    // 4. Track Markers
+    // Markers
     if (markersGroupRef.current) {
       sceneRef.current.remove(markersGroupRef.current);
     }
     const markersGroup = new THREE.Group();
     const markerGeo = new THREE.BoxGeometry(0.1, 0.05, requiredDepth);
     const markerMat = new THREE.MeshStandardMaterial({ color: '#334155', opacity: 0.5, transparent: true });
-
-    // Markers every 10m along the X axis
     for (let i = 10; i <= trackLength / 2; i += 10) {
       const marker = new THREE.Mesh(markerGeo, markerMat);
       marker.position.set(i, 0.05, 0);
@@ -303,7 +290,7 @@ export const WorldView: React.FC<WorldViewProps> = ({
     sceneRef.current.add(markersGroup);
     markersGroupRef.current = markersGroup;
 
-    // 5. Update Lights for larger area
+    // Lights
     if (dirLightRef.current) {
       const d = Math.max(100, requiredDepth / 2);
       dirLightRef.current.shadow.camera.left = -d;
@@ -313,100 +300,26 @@ export const WorldView: React.FC<WorldViewProps> = ({
       dirLightRef.current.shadow.camera.updateProjectionMatrix();
     }
 
-
-    // --- PHYSICS SETUP ---
-
-    // Reset Simulation State
-    simTimeRef.current = 0;
-    disqualifiedRef.current.clear();
-
-    // Clear references BEFORE freeing the world
-    physObjectsRef.current.forEach(obj => {
-      sceneRef.current?.remove(obj.mesh);
-      obj.mesh.geometry.dispose();
-      (obj.mesh.material as THREE.Material).dispose();
+    // --- Rebuild Meshes ---
+    // Clear old meshes
+    meshMapRef.current.forEach(mesh => {
+      sceneRef.current?.remove(mesh);
+      mesh.geometry.dispose();
+      (mesh.material as THREE.Material).dispose();
     });
+    meshMapRef.current = [];
+    idMapRef.current.clear();
 
-    physObjectsRef.current = [];
-    physJointsRef.current = [];
-    brainStatesRef.current = new Map();
-    rootBodiesRef.current = new Map();
-
-    if (worldRef.current) {
-      worldRef.current.free();
-      worldRef.current = null;
-    }
-
-    const gravity = { x: 0.0, y: -9.81, z: 0.0 };
-    const world = new RAPIER.World(gravity);
-    worldRef.current = world;
-
-    const GROUP_GROUND = 0x0001;
-    const GROUP_CREATURE = 0x0002;
-
-    const groundCollisionGroups = (GROUP_GROUND << 16) | GROUP_CREATURE;
-    // Disable self-collision for creatures (only collide with ground) to allow complex morphologies
-    const creatureCollisionGroups = (GROUP_CREATURE << 16) | GROUP_GROUND;
-
-    // Thicker ground to prevent tunneling, sized to match visual environment
-    const groundColliderDesc = RAPIER.ColliderDesc.cuboid(trackLength / 2.0, 5.0, groundHalfDepth);
-    groundColliderDesc.setTranslation(0.0, -5.0, 0.0);
-    groundColliderDesc.setCollisionGroups(groundCollisionGroups);
-    world.createCollider(groundColliderDesc);
-
+    // Create new meshes
     population.forEach((ind, index) => {
       let zPos = 0;
       if (index > 0) {
         const offset = Math.ceil(index / 2) * laneWidth;
         zPos = (index % 2 === 0) ? offset : -offset;
       }
+      const startPos = { x: 0, y: 4, z: zPos };
 
-      const startPos = new THREE.Vector3(0, 4, zPos);
-
-      const bodyMap = new Map<number, RAPIER.RigidBody>();
-      const nodes = ind.genome.morphology;
-
-      const parentToChildren = new Map<number, BlockNode[]>();
-      nodes.forEach(b => {
-        if (b.parentId !== undefined) {
-          const list = parentToChildren.get(b.parentId) || [];
-          list.push(b);
-          parentToChildren.set(b.parentId, list);
-        }
-      });
-
-      nodes.forEach(block => {
-        const rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic();
-
-        // Moderate damping for stability
-        rigidBodyDesc.setLinearDamping(0.5);
-        rigidBodyDesc.setAngularDamping(1.0);
-
-        rigidBodyDesc.setTranslation(
-          startPos.x + (block.parentId !== undefined ? 1 : 0) * (block.id * 0.5),
-          startPos.y + block.id * 0.2,
-          startPos.z
-        );
-
-        const body = world.createRigidBody(rigidBodyDesc);
-
-        const colliderDesc = RAPIER.ColliderDesc.cuboid(
-          (block.size[0] / 2) * 0.95,
-          (block.size[1] / 2) * 0.95,
-          (block.size[2] / 2) * 0.95
-        );
-        colliderDesc.setFriction(1.0);
-        colliderDesc.setRestitution(0.0);
-        colliderDesc.setDensity(2.0);
-        colliderDesc.setCollisionGroups(creatureCollisionGroups);
-
-        world.createCollider(colliderDesc, body);
-
-        bodyMap.set(block.id, body);
-        if (block.parentId === undefined) {
-          rootBodiesRef.current.set(ind.id, body);
-        }
-
+      ind.genome.morphology.forEach(block => {
         const geometry = new THREE.BoxGeometry(block.size[0], block.size[1], block.size[2]);
         const material = new THREE.MeshStandardMaterial({
           color: block.color,
@@ -418,265 +331,50 @@ export const WorldView: React.FC<WorldViewProps> = ({
         mesh.receiveShadow = true;
         mesh.userData = { individualId: ind.id, blockId: block.id };
 
+        // Initial position (will be updated by worker immediately)
+        mesh.position.set(
+          startPos.x + (block.parentId !== undefined ? 1 : 0) * (block.id * 0.5),
+          startPos.y + block.id * 0.2,
+          startPos.z
+        );
+
         sceneRef.current?.add(mesh);
+        meshMapRef.current.push(mesh);
 
-        physObjectsRef.current.push({ mesh, body, id: ind.id, blockId: block.id });
-      });
-
-      nodes.forEach(block => {
-        if (block.parentId === undefined) return;
-
-        const parentBody = bodyMap.get(block.parentId);
-        const childBody = bodyMap.get(block.id);
-        const parentBlock = nodes.find(n => n.id === block.parentId);
-
-        if (parentBody && childBody && parentBlock) {
-
-          const siblings = parentToChildren.get(block.parentId) || [];
-          const faceGroup = siblings.filter(s => s.attachFace === block.attachFace);
-          const indexInFace = faceGroup.findIndex(s => s.id === block.id);
-          const countInFace = faceGroup.length;
-
-          const face = block.attachFace;
-          const axisIdx = Math.floor(face / 2);
-          const dir = face % 2 === 0 ? 1 : -1;
-
-          const parentHalf = parentBlock.size[axisIdx] / 2;
-          const childHalf = block.size[axisIdx] / 2;
-
-          // Spread Logic
-          let spreadOffset = 0;
-          let spreadAxis = 0;
-
-          // Select spread axis based on face normal
-          if (axisIdx === 0) spreadAxis = 2; // Face X -> Spread Z
-          else if (axisIdx === 1) spreadAxis = 0; // Face Y -> Spread X
-          else spreadAxis = 0; // Face Z -> Spread X
-
-          if (countInFace > 1) {
-            const parentDim = parentBlock.size[spreadAxis];
-            const available = parentDim * 0.8;
-            const t = indexInFace / (countInFace - 1);
-            spreadOffset = (t - 0.5) * available;
-          }
-
-          let a1 = { x: 0, y: 0, z: 0 };
-          if (axisIdx === 0) a1.x = parentHalf * dir;
-          if (axisIdx === 1) a1.y = parentHalf * dir;
-          if (axisIdx === 2) a1.z = parentHalf * dir;
-
-          // Apply Spread to Parent Anchor
-          if (spreadAxis === 0) a1.x += spreadOffset;
-          if (spreadAxis === 1) a1.y += spreadOffset;
-          if (spreadAxis === 2) a1.z += spreadOffset;
-
-          let a2 = { x: 0, y: 0, z: 0 };
-          if (axisIdx === 0) a2.x = -childHalf * dir;
-          if (axisIdx === 1) a2.y = -childHalf * dir;
-          if (axisIdx === 2) a2.z = -childHalf * dir;
-
-          let axis;
-          if (block.jointType === JointType.SPHERICAL) {
-            // Swivel Axis (Y)
-            axis = { x: 0, y: 1, z: 0 };
-          } else {
-            // Hinge Axis (Z)
-            axis = { x: 0, y: 0, z: 1 };
-          }
-
-          const jointData = RAPIER.JointData.revolute(a1, a2, axis);
-          jointData.limitsEnabled = true;
-          jointData.limits = [-Math.PI / 1.5, Math.PI / 1.5];
-
-          const joint = world.createImpulseJoint(jointData, parentBody, childBody, true);
-
-          (joint as any).configureMotorModel(RAPIER.MotorModel.ForceBased);
-
-          // Use deterministic params from genome if available, otherwise fallback to deterministic default
-          const params = block.jointParams || { speed: 5, phase: block.id * 0.5, amp: 1.0 };
-
-          physJointsRef.current.push({
-            joint,
-            motorType: block.jointType || JointType.REVOLUTE,
-            phase: params.phase,
-            speed: params.speed,
-            amp: params.amp,
-            body: childBody,
-            parentBody: parentBody,
-            blockId: block.id,
-            individualId: ind.id
-          });
+        if (block.id === 0) { // Root block
+          idMapRef.current.set(ind.id, mesh);
         }
       });
-
-      brainStatesRef.current.set(ind.id, buildBrainInstance(ind.genome));
     });
 
-  }, [generation, isPhysicsReady, population.length]);
+    // Send to Worker
+    workerRef.current.postMessage({
+      type: 'SET_POPULATION',
+      payload: { population }
+    });
 
-  // 4. Animation Loop
+  }, [population.length, generation, isPhysicsReady]); // Re-run when population size or generation changes (new pop)
+
+  // 4. Control Simulation
   useEffect(() => {
-    let lastTime = performance.now();
+    if (!workerRef.current) return;
+    if (isPlaying && isPhysicsReady) {
+      workerRef.current.postMessage({ type: 'START' });
+    } else {
+      workerRef.current.postMessage({ type: 'STOP' });
+    }
+  }, [isPlaying, isPhysicsReady]);
 
-    const animate = (time: number) => {
-      requestRef.current = requestAnimationFrame(animate);
-      if (!worldRef.current || !sceneRef.current || !cameraRef.current || !controlsRef.current) return;
-
-      const deltaTime = (time - lastTime) / 1000;
-      lastTime = time;
-
-      if (isPlaying) {
-        const fixedTimeStep = 1 / 60;
-        worldRef.current.timestep = fixedTimeStep;
-
-        const steps = Math.min(5, Math.ceil(simulationSpeed));
-        const jointsByCreature = new Map<string, PhysJoint[]>();
-        physJointsRef.current.forEach(pj => {
-          const list = jointsByCreature.get(pj.individualId) || [];
-          list.push(pj);
-          jointsByCreature.set(pj.individualId, list);
-        });
-
-        for (let i = 0; i < steps; i++) {
-          simTimeRef.current += fixedTimeStep;
-          const t = simTimeRef.current;
-
-          updateBrainActivations(t, jointsByCreature);
-
-          physJointsRef.current.forEach(pj => {
-            if (!pj.body.isValid() || !pj.parentBody.isValid()) return;
-
-            const brain = brainStatesRef.current.get(pj.individualId);
-            const activation = brain?.activations[`a${pj.blockId}`];
-            const targetPos = activation !== undefined
-              ? activation * pj.amp
-              : Math.sin(t * pj.speed + pj.phase) * pj.amp;
-
-            // Lower stiffness and damping to avoid explosions since we can't hard clamp torque easily in Rapier JS ImpulseJoints
-            const stiffness = 200.0;
-            const damping = 20.0;
-
-            (pj.joint as any).configureMotorPosition(targetPos, stiffness, damping);
-          });
-
-          try {
-            worldRef.current.step();
-          } catch (e) {
-            console.error("Physics Panic:", e);
-          }
-        }
-      }
-
-      // Sync Physics to Visuals
-      const currentFitness: Record<string, number> = {};
-      const VELOCITY_THRESHOLD = 50.0; // m/s threshold for explosion detection
-
-      physObjectsRef.current.forEach(obj => {
-        if (!obj.body.isValid()) return;
-
-        // If disqualified, keep reporting low fitness and skip visual updates
-        if (disqualifiedRef.current.has(obj.id)) {
-          obj.mesh.visible = false;
-          if (obj.blockId === 0) {
-            currentFitness[obj.id] = -10000; // Heavy penalty
-          }
-          return;
-        }
-
-        try {
-          // Check for physics explosions
-          const linvel = obj.body.linvel();
-          const velMag = Math.sqrt(linvel.x ** 2 + linvel.y ** 2 + linvel.z ** 2);
-
-          if (velMag > VELOCITY_THRESHOLD) {
-            // Disqualify this creature
-            disqualifiedRef.current.add(obj.id);
-
-            // Hide and sleep
-            obj.body.setTranslation({ x: 0, y: -100, z: 0 }, true);
-            obj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-            obj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-            obj.body.sleep();
-
-            obj.mesh.visible = false;
-
-            if (obj.blockId === 0) {
-              currentFitness[obj.id] = -10000;
-            }
-            return;
-          }
-
-          const t = obj.body.translation();
-          const r = obj.body.rotation();
-
-          if (Number.isFinite(t.x) && !Number.isNaN(r.w)) {
-            obj.mesh.position.set(t.x, t.y, t.z);
-            obj.mesh.quaternion.set(r.x, r.y, r.z, r.w);
-            obj.mesh.visible = true;
-
-            // Respawn fell creatures
-            if (t.y < -20) {
-              obj.body.setTranslation({ x: 0, y: 5, z: 0 }, true);
-              obj.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-              obj.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-            }
-          }
-
-          if (obj.blockId === 0) {
-            currentFitness[obj.id] = t.x;
-          }
-        } catch (e) {
-          // Catch any transient WASM read errors or NaN
-          disqualifiedRef.current.add(obj.id);
-          obj.mesh.visible = false;
-          if (obj.blockId === 0) currentFitness[obj.id] = -10000;
-        }
-      });
-
-      if (time - lastFitnessReportRef.current > 50) {
-        onFitnessUpdateRef.current(currentFitness);
-        lastFitnessReportRef.current = time;
-      }
-
-      // Camera Follow Logic
-      const currentSelectedId = selectedIdRef.current;
-      let targetPos: THREE.Vector3 | null = null;
-
-      if (currentSelectedId && !disqualifiedRef.current.has(currentSelectedId)) {
-        const targetObj = physObjectsRef.current.find(obj => obj.id === currentSelectedId && obj.blockId === 0);
-        if (targetObj) {
-          targetPos = targetObj.mesh.position.clone();
-        }
-      }
-
-      if (targetPos) {
-        if (shouldSnapCameraRef.current) {
-          const offset = cameraRef.current.position.clone().sub(controlsRef.current.target);
-          controlsRef.current.target.copy(targetPos);
-          cameraRef.current.position.copy(targetPos).add(offset);
-          shouldSnapCameraRef.current = false;
-          prevTargetPosRef.current = targetPos;
-        } else if (prevTargetPosRef.current) {
-          const delta = targetPos.clone().sub(prevTargetPosRef.current);
-          cameraRef.current.position.add(delta);
-          controlsRef.current.target.add(delta);
-          prevTargetPosRef.current = targetPos;
-        }
-      }
-
-      controlsRef.current.update();
-      rendererRef.current.render(sceneRef.current, cameraRef.current);
-    };
-
-    requestRef.current = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(requestRef.current);
-  }, [isPlaying, simulationSpeed]);
+  useEffect(() => {
+    if (!workerRef.current) return;
+    workerRef.current.postMessage({ type: 'UPDATE_SPEED', payload: simulationSpeed });
+  }, [simulationSpeed]);
 
   return (
     <div ref={containerRef} className="w-full h-full relative rounded-lg overflow-hidden border border-slate-800 shadow-2xl bg-[#020617] cursor-move">
       {!isPhysicsReady && (
         <div className="absolute inset-0 flex items-center justify-center text-emerald-500 font-mono bg-slate-950 z-20">
-          INITIALIZING RAPIER ENGINE...
+          INITIALIZING PHYSICS ENGINE...
         </div>
       )}
     </div>
