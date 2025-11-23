@@ -233,6 +233,7 @@ function App() {
     lastTimerUpdateRef.current = Date.now();
 
     setViewMode('SIMULATION');
+    setIsPlaying(true);
   };
 
   // Editor Handlers
