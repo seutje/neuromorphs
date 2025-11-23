@@ -179,7 +179,7 @@ export const WorldView: React.FC<WorldViewProps> = ({
     if (!isPhysicsReady || !sceneRef.current) return;
 
     // --- CALCULATE DYNAMIC SCENE DIMENSIONS ---
-    const laneWidth = 6.0;
+    const laneWidth = 3.0;
     const trackLength = 2000; // X-Axis
     // Dynamic Z-depth based on population to prevent spawn-in-void
     const requiredDepth = Math.max(1000, population.length * laneWidth * 1.2);
