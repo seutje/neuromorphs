@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Individual } from '../types';
 import SimulationWorker from '../simulation.worker?worker';
+import { useResizeObserver } from '../hooks/useResizeObserver';
 
 interface WorldViewProps {
   population: Individual[];
@@ -257,6 +258,15 @@ export const WorldView: React.FC<WorldViewProps> = ({
       renderer.dispose();
     };
   }, []);
+
+  // Handle Resize
+  useResizeObserver(containerRef, (width, height) => {
+    if (!cameraRef.current || !rendererRef.current) return;
+
+    cameraRef.current.aspect = width / height;
+    cameraRef.current.updateProjectionMatrix();
+    rendererRef.current.setSize(width, height);
+  });
 
   // 3. Sync Population & Environment
   useEffect(() => {

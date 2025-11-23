@@ -1,6 +1,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { useResizeObserver } from '../hooks/useResizeObserver';
 import { Genome, NeuralConnection, NeuralNode, BlockNode, NodeType } from '../types';
 
 interface BrainVisualizerProps {
@@ -12,17 +13,18 @@ export const BrainVisualizer: React.FC<BrainVisualizerProps> = ({ genome, active
   const { nodes, connections } = genome.brain;
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  const drawRef = useRef<(time: number) => void>(() => { });
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const c = canvas as any;
-    const ctx = c.getContext('2d');
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     let animationFrameId: number;
 
     const draw = (time: number) => {
-      ctx.clearRect(0, 0, c.width, c.height);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       // Draw connections
       connections.forEach(conn => {
@@ -30,10 +32,10 @@ export const BrainVisualizer: React.FC<BrainVisualizerProps> = ({ genome, active
         const target = nodes.find(n => n.id === conn.target);
         if (!source || !target) return;
 
-        const sx = source.x * c.width;
-        const sy = source.y * c.height;
-        const tx = target.x * c.width;
-        const ty = target.y * c.height;
+        const sx = source.x * canvas.width;
+        const sy = source.y * canvas.height;
+        const tx = target.x * canvas.width;
+        const ty = target.y * canvas.height;
 
         // Pulse effect if active
         const pulse = active ? Math.sin(time * 0.005 + (Math.abs(conn.weight) * 10)) : 0;
@@ -51,8 +53,8 @@ export const BrainVisualizer: React.FC<BrainVisualizerProps> = ({ genome, active
 
       // Draw Nodes
       nodes.forEach(node => {
-        const x = node.x * c.width;
-        const y = node.y * c.height;
+        const x = node.x * canvas.width;
+        const y = node.y * canvas.height;
 
         ctx.beginPath();
         ctx.arc(x, y, 6, 0, Math.PI * 2);
@@ -80,16 +82,31 @@ export const BrainVisualizer: React.FC<BrainVisualizerProps> = ({ genome, active
         ctx.textAlign = 'center';
         ctx.fillText(node.label, x, y + 16); // Position below the node
       });
+    };
 
+    drawRef.current = draw;
+
+    const animate = (time: number) => {
+      draw(time);
       if (active) {
-        animationFrameId = requestAnimationFrame(draw);
+        animationFrameId = requestAnimationFrame(animate);
       }
     };
 
-    draw(0);
+    animate(0);
 
     return () => cancelAnimationFrame(animationFrameId);
   }, [genome, active]);
+
+  useResizeObserver(canvasRef, (width, height) => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.width = width;
+      canvas.height = height;
+      // Force a redraw after resize
+      drawRef.current(0);
+    }
+  });
 
   return (
     <div className="relative w-full h-48 bg-slate-900/50 rounded border border-slate-700 overflow-hidden">
@@ -107,6 +124,7 @@ export const MorphologyVisualizer: React.FC<MorphologyVisualizerProps> = ({ geno
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const creatureRef = useRef<THREE.Group | null>(null);
 
   useEffect(() => {
@@ -125,6 +143,7 @@ export const MorphologyVisualizer: React.FC<MorphologyVisualizerProps> = ({ geno
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
     camera.position.set(4, 4, 5);
     camera.lookAt(0, 0, 0);
+    cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(width, height);
@@ -149,25 +168,23 @@ export const MorphologyVisualizer: React.FC<MorphologyVisualizerProps> = ({ geno
     };
     animate();
 
-    const handleResize = () => {
-      if (!container) return;
-      const w = (container as any).clientWidth;
-      const h = (container as any).clientHeight;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
-    };
-    (window as any).addEventListener('resize', handleResize);
+
 
     return () => {
       cancelAnimationFrame(frameId);
-      (window as any).removeEventListener('resize', handleResize);
       if (rendererRef.current && container) {
         (container as any).removeChild(rendererRef.current.domElement);
       }
       renderer.dispose();
     };
   }, []);
+
+  useResizeObserver(containerRef, (width, height) => {
+    if (!cameraRef.current || !rendererRef.current) return;
+    cameraRef.current.aspect = width / height;
+    cameraRef.current.updateProjectionMatrix();
+    rendererRef.current.setSize(width, height);
+  });
 
   // Rebuild creature on genome change
   useEffect(() => {

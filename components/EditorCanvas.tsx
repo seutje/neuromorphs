@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Genome, BlockNode } from '../types';
+import { useResizeObserver } from '../hooks/useResizeObserver';
 
 interface EditorCanvasProps {
     genome: Genome;
@@ -89,19 +90,10 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({ genome, selectedBloc
         renderer.domElement.addEventListener('click', handleClick);
 
         // Resize Handler
-        const handleResize = () => {
-            if (!container || !camera || !renderer) return;
-            const w = container.clientWidth;
-            const h = container.clientHeight;
-            camera.aspect = w / h;
-            camera.updateProjectionMatrix();
-            renderer.setSize(w, h);
-        };
-        window.addEventListener('resize', handleResize);
+        // Removed window listener in favor of ResizeObserver
 
         return () => {
             cancelAnimationFrame(frameId);
-            window.removeEventListener('resize', handleResize);
             renderer.domElement.removeEventListener('click', handleClick);
             if (renderer && container) {
                 container.removeChild(renderer.domElement);
@@ -109,6 +101,13 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({ genome, selectedBloc
             renderer.dispose();
         };
     }, []); // Run once on mount
+
+    useResizeObserver(containerRef, (width, height) => {
+        if (!cameraRef.current || !rendererRef.current) return;
+        cameraRef.current.aspect = width / height;
+        cameraRef.current.updateProjectionMatrix();
+        rendererRef.current.setSize(width, height);
+    });
 
     // Rebuild Creature when genome changes
     useEffect(() => {
