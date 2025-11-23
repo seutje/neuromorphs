@@ -9,7 +9,8 @@ import { BrainVisualizer, MorphologyVisualizer } from './components/Visualizers'
 import { SettingsPane } from './components/SettingsPane';
 import { EditorCanvas } from './components/EditorCanvas';
 import { EditorPropertiesPanel } from './components/EditorPropertiesPanel';
-import { BlockNode, JointType } from './types';
+import { HistoryPanel } from './components/HistoryPanel';
+import { BlockNode, JointType, Genome } from './types';
 
 // Initial Config
 const INITIAL_CONFIG: SimulationConfig = {
@@ -40,6 +41,10 @@ function App() {
   const [population, setPopulation] = useState<Individual[]>([]);
   const [editedGenome, setEditedGenome] = useState<Individual['genome'] | null>(null);
   const [selectedBlockId, setSelectedBlockId] = useState<number | null>(null);
+
+  // Editor History State
+  const [editHistory, setEditHistory] = useState<{ genome: Genome; description: string; timestamp: number }[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(0);
 
   // Tracking State
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -189,13 +194,14 @@ function App() {
     setIsPlaying(false);
     // If we have a selected creature, edit that one, otherwise use the best, or generate a new one
     const template = selectedIndividual || bestIndividual || population[0];
-    if (template) {
-      // Deep clone to avoid mutating simulation state directly
-      setEditedGenome(JSON.parse(JSON.stringify(template.genome)));
-    } else {
-      // Fallback if population is empty (shouldn't happen usually)
-      setEditedGenome(generateIndividual(0, 0).genome);
-    }
+
+    // Initialize History
+    const initialGenome = template ? JSON.parse(JSON.stringify(template.genome)) : generateIndividual(0, 0).genome;
+
+    setEditedGenome(initialGenome);
+    setEditHistory([{ genome: initialGenome, description: 'Initial State', timestamp: Date.now() }]);
+    setHistoryIndex(0);
+
     setViewMode('EDITOR');
   };
 
@@ -237,12 +243,44 @@ function App() {
   };
 
   // Editor Handlers
+  // History Helpers
+  const addToHistory = (newGenome: Genome, description: string) => {
+    const newEntry = { genome: newGenome, description, timestamp: Date.now() };
+    const newHistory = editHistory.slice(0, historyIndex + 1);
+    newHistory.push(newEntry);
+    setEditHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+    setEditedGenome(newGenome);
+  };
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      setEditedGenome(editHistory[newIndex].genome);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < editHistory.length - 1) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      setEditedGenome(editHistory[newIndex].genome);
+    }
+  };
+
+  const handleJumpToHistory = (index: number) => {
+    setHistoryIndex(index);
+    setEditedGenome(editHistory[index].genome);
+  };
+
   const handleUpdateBlock = (blockId: number, updates: Partial<BlockNode>) => {
     if (!editedGenome) return;
     const newMorphology = editedGenome.morphology.map(b =>
       b.id === blockId ? { ...b, ...updates } : b
     );
-    setEditedGenome({ ...editedGenome, morphology: newMorphology });
+    const newGenome = { ...editedGenome, morphology: newMorphology };
+    addToHistory(newGenome, `Updated Block ${blockId}`);
   };
 
   const handleAddChild = (parentId: number, face: number) => {
@@ -267,7 +305,8 @@ function App() {
       jointParams: { speed: randomSpeed, phase: randomPhase, amp: randomAmp }
     };
 
-    setEditedGenome({ ...editedGenome, morphology: [...editedGenome.morphology, newBlock] });
+    const newGenome = { ...editedGenome, morphology: [...editedGenome.morphology, newBlock] };
+    addToHistory(newGenome, 'Added Child Block');
     setSelectedBlockId(newId);
   };
 
@@ -282,7 +321,8 @@ function App() {
     findChildren(blockId);
 
     const newMorphology = editedGenome.morphology.filter(b => !toDelete.has(b.id));
-    setEditedGenome({ ...editedGenome, morphology: newMorphology });
+    const newGenome = { ...editedGenome, morphology: newMorphology };
+    addToHistory(newGenome, 'Deleted Block');
     setSelectedBlockId(null);
   };
 
@@ -423,10 +463,20 @@ function App() {
             )}
           </div>
 
-          {/* Charts Panel */}
+          {/* Charts Panel or History Panel */}
           {!isMobile && (
             <div className="hidden md:block h-64 bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg">
-              <StatsPanel history={history} />
+              {viewMode === 'SIMULATION' ? (
+                <StatsPanel history={history} />
+              ) : (
+                <HistoryPanel
+                  history={editHistory}
+                  currentIndex={historyIndex}
+                  onUndo={handleUndo}
+                  onRedo={handleRedo}
+                  onJumpTo={handleJumpToHistory}
+                />
+              )}
             </div>
           )}
         </div>
