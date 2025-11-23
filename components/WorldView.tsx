@@ -210,15 +210,6 @@ export const WorldView: React.FC<WorldViewProps> = ({
     scene.add(dirLight);
     dirLightRef.current = dirLight;
 
-    // Arrow Helper (Origin)
-    const arrowHelper = new THREE.ArrowHelper(
-      new THREE.Vector3(1, 0, 0),
-      new THREE.Vector3(0, 2, 0),
-      5,
-      0x10b981
-    );
-    scene.add(arrowHelper);
-
     const onMouseClick = (event: any) => {
       if (!container || !sceneRef.current || !cameraRef.current) return;
       const rect = container.getBoundingClientRect();
