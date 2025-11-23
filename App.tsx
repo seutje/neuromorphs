@@ -346,7 +346,7 @@ function App() {
           </h1>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="hidden lg:flex items-center gap-3">
           <h2 className="text-md font-bold tracking-tight text-white">
             Inspired by <a href="https://www.karlsims.com/evolved-virtual-creatures.html" target="_blank" className="text-emerald-400">Karl Sims</a>
           </h2>
@@ -465,7 +465,7 @@ function App() {
 
           {/* Charts Panel or History Panel */}
           {!isMobile && (
-            <div className="hidden md:block h-64 bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg">
+            <div className="hidden lg:block h-64 bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg">
               {viewMode === 'SIMULATION' ? (
                 <StatsPanel history={history} />
               ) : (
