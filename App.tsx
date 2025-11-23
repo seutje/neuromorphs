@@ -255,14 +255,23 @@ function App() {
   const handleAddChild = (parentId: number, face: number) => {
     if (!editedGenome) return;
     const newId = Math.max(...editedGenome.morphology.map(b => b.id)) + 1;
+
+    // Randomize Properties (Tuned to match default generation)
+    const randomSize = () => 0.4 + Math.random() * 0.4; // 0.4 to 0.8 (more controlled)
+    const randomColor = '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
+    const randomJointType = Math.random() > 0.6 ? JointType.REVOLUTE : JointType.SPHERICAL; // Bias towards Revolute
+    const randomSpeed = 2 + Math.random() * 4; // 2 to 6
+    const randomPhase = Math.random() * Math.PI * 2;
+    const randomAmp = 0.5 + Math.random() * 0.5; // 0.5 to 1.0
+
     const newBlock: BlockNode = {
       id: newId,
-      size: [1, 1, 1],
-      color: '#34d399', // Emerald-400 default
+      size: [randomSize(), randomSize(), randomSize()],
+      color: randomColor,
       parentId: parentId,
       attachFace: face,
-      jointType: JointType.REVOLUTE,
-      jointParams: { speed: 5, phase: 0, amp: 1.0 }
+      jointType: randomJointType,
+      jointParams: { speed: randomSpeed, phase: randomPhase, amp: randomAmp }
     };
 
     setEditedGenome({ ...editedGenome, morphology: [...editedGenome.morphology, newBlock] });
