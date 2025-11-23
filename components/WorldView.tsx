@@ -3,7 +3,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { Individual, BlockNode, JointType } from '../types';
+import { Individual, BlockNode, JointType, NodeType, Genome, NeuralConnection } from '../types';
 
 interface WorldViewProps {
   population: Individual[];
@@ -30,6 +30,14 @@ interface PhysJoint {
   amp: number;
   body: RAPIER.RigidBody;
   parentBody: RAPIER.RigidBody;
+  blockId: number;
+  individualId: string;
+}
+
+interface BrainInstance {
+  genome: Genome;
+  activations: Record<string, number>;
+  connectionsByTarget: Map<string, NeuralConnection[]>;
 }
 
 export const WorldView: React.FC<WorldViewProps> = ({
@@ -59,6 +67,8 @@ export const WorldView: React.FC<WorldViewProps> = ({
   const physObjectsRef = useRef<PhysObject[]>([]);
   const physJointsRef = useRef<PhysJoint[]>([]);
   const disqualifiedRef = useRef<Set<string>>(new Set());
+  const brainStatesRef = useRef<Map<string, BrainInstance>>(new Map());
+  const rootBodiesRef = useRef<Map<string, RAPIER.RigidBody>>(new Map());
 
   const requestRef = useRef<number>(0);
   const raycasterRef = useRef<THREE.Raycaster>(new THREE.Raycaster());
@@ -75,6 +85,68 @@ export const WorldView: React.FC<WorldViewProps> = ({
 
   // Simulation time accumulator
   const simTimeRef = useRef(0);
+
+  const buildBrainInstance = (genome: Genome): BrainInstance => {
+    const activations: Record<string, number> = {};
+    const connectionsByTarget = new Map<string, NeuralConnection[]>();
+
+    genome.brain.nodes.forEach(node => {
+      activations[node.id] = node.activation || 0;
+    });
+
+    genome.brain.connections.forEach(conn => {
+      const list = connectionsByTarget.get(conn.target) || [];
+      list.push(conn);
+      connectionsByTarget.set(conn.target, list);
+    });
+
+    return { genome, activations, connectionsByTarget };
+  };
+
+  const updateBrainActivations = (time: number, jointsByCreature: Map<string, PhysJoint[]>) => {
+    jointsByCreature.forEach((joints, creatureId) => {
+      const brain = brainStatesRef.current.get(creatureId);
+      const rootBody = rootBodiesRef.current.get(creatureId);
+
+      if (!brain || !rootBody || !rootBody.isValid()) return;
+
+      const linvel = rootBody.linvel();
+      const translation = rootBody.translation();
+
+      const groundSensor = translation.y < 0.55 ? 1 : -1;
+      const velocitySensor = Math.tanh(linvel.x / 5);
+      const motionSensor = joints.length > 0
+        ? Math.tanh((Math.abs(joints[0].body.angvel().x) + Math.abs(joints[0].body.angvel().y) + Math.abs(joints[0].body.angvel().z)) / 6)
+        : 0;
+
+      const newActivations: Record<string, number> = {};
+      const previousActivations = brain.activations;
+
+      brain.genome.brain.nodes.forEach(node => {
+        switch (node.type) {
+          case NodeType.SENSOR: {
+            if (node.id === 's1') newActivations[node.id] = groundSensor;
+            else if (node.id === 's2') newActivations[node.id] = motionSensor;
+            else if (node.id === 's3') newActivations[node.id] = velocitySensor;
+            else newActivations[node.id] = 0;
+            break;
+          }
+          case NodeType.OSCILLATOR: {
+            newActivations[node.id] = Math.sin(time * 2 + node.y * 10);
+            break;
+          }
+          default: {
+            const inputs = brain.connectionsByTarget.get(node.id) || [];
+            const sum = inputs.reduce((acc, conn) => acc + (previousActivations[conn.source] ?? 0) * conn.weight, 0);
+            newActivations[node.id] = Math.tanh(sum);
+            break;
+          }
+        }
+      });
+
+      brain.activations = newActivations;
+    });
+  };
 
   // Update refs
   useEffect(() => {
@@ -266,6 +338,8 @@ export const WorldView: React.FC<WorldViewProps> = ({
 
     physObjectsRef.current = [];
     physJointsRef.current = [];
+    brainStatesRef.current = new Map();
+    rootBodiesRef.current = new Map();
 
     if (worldRef.current) {
       worldRef.current.free();
@@ -338,6 +412,9 @@ export const WorldView: React.FC<WorldViewProps> = ({
         world.createCollider(colliderDesc, body);
 
         bodyMap.set(block.id, body);
+        if (block.parentId === undefined) {
+          rootBodiesRef.current.set(ind.id, body);
+        }
 
         const geometry = new THREE.BoxGeometry(block.size[0], block.size[1], block.size[2]);
         const material = new THREE.MeshStandardMaterial({
@@ -434,10 +511,14 @@ export const WorldView: React.FC<WorldViewProps> = ({
             speed: params.speed,
             amp: params.amp,
             body: childBody,
-            parentBody: parentBody
+            parentBody: parentBody,
+            blockId: block.id,
+            individualId: ind.id
           });
         }
       });
+
+      brainStatesRef.current.set(ind.id, buildBrainInstance(ind.genome));
     });
 
   }, [generation, isPhysicsReady, population.length]);
@@ -458,15 +539,27 @@ export const WorldView: React.FC<WorldViewProps> = ({
         worldRef.current.timestep = fixedTimeStep;
 
         const steps = Math.min(5, Math.ceil(simulationSpeed));
+        const jointsByCreature = new Map<string, PhysJoint[]>();
+        physJointsRef.current.forEach(pj => {
+          const list = jointsByCreature.get(pj.individualId) || [];
+          list.push(pj);
+          jointsByCreature.set(pj.individualId, list);
+        });
 
         for (let i = 0; i < steps; i++) {
           simTimeRef.current += fixedTimeStep;
           const t = simTimeRef.current;
 
+          updateBrainActivations(t, jointsByCreature);
+
           physJointsRef.current.forEach(pj => {
             if (!pj.body.isValid() || !pj.parentBody.isValid()) return;
 
-            const targetPos = Math.sin(t * pj.speed + pj.phase) * pj.amp;
+            const brain = brainStatesRef.current.get(pj.individualId);
+            const activation = brain?.activations[`a${pj.blockId}`];
+            const targetPos = activation !== undefined
+              ? activation * pj.amp
+              : Math.sin(t * pj.speed + pj.phase) * pj.amp;
 
             // Lower stiffness and damping to avoid explosions since we can't hard clamp torque easily in Rapier JS ImpulseJoints
             const stiffness = 200.0;
