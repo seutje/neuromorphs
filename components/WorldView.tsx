@@ -84,26 +84,17 @@ export const WorldView: React.FC<WorldViewProps> = ({
             const offset = i * 7;
             const mesh = meshes[i];
 
-            mesh.position.set(
-              transforms[offset],
-              transforms[offset + 1],
-              transforms[offset + 2]
-            );
+            const x = transforms[offset];
+            const y = transforms[offset + 1];
+            const z = transforms[offset + 2];
+
+            mesh.position.set(x, y, z);
             mesh.quaternion.set(
               transforms[offset + 3],
               transforms[offset + 4],
               transforms[offset + 5],
               transforms[offset + 6]
             );
-
-            // Simple visibility check (if it fell too far or is invalid, it might be at 0,-100,0)
-            // But we let the worker handle logic, we just render.
-            // We can hide if y < -50 maybe?
-            if (transforms[offset + 1] < -50) {
-              mesh.visible = false;
-            } else {
-              mesh.visible = true;
-            }
           }
         }
 
@@ -183,6 +174,9 @@ export const WorldView: React.FC<WorldViewProps> = ({
     renderer.domElement.addEventListener('click', onMouseClick);
 
     // Render Loop
+    const frustum = new THREE.Frustum();
+    const projScreenMatrix = new THREE.Matrix4();
+
     let reqId = 0;
     const animate = () => {
       reqId = requestAnimationFrame(animate);
@@ -211,6 +205,28 @@ export const WorldView: React.FC<WorldViewProps> = ({
           cameraRef.current!.position.add(delta);
           controlsRef.current!.target.add(delta);
           prevTargetPosRef.current = targetPos;
+        }
+      }
+
+      // Frustum Culling Update
+      if (cameraRef.current) {
+        cameraRef.current.updateMatrixWorld();
+        projScreenMatrix.multiplyMatrices(
+          cameraRef.current.projectionMatrix,
+          cameraRef.current.matrixWorldInverse
+        );
+        frustum.setFromProjectionMatrix(projScreenMatrix);
+
+        const meshes = meshMapRef.current;
+        for (let i = 0; i < meshes.length; i++) {
+          const mesh = meshes[i];
+          // Check visibility
+          const inFrustum = frustum.containsPoint(mesh.position);
+          if (mesh.position.y < -50 || !inFrustum) {
+            mesh.visible = false;
+          } else {
+            mesh.visible = true;
+          }
         }
       }
 
