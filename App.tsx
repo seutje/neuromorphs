@@ -434,7 +434,7 @@ function App() {
                 </div>
 
                 {/* Playback Controls Overlay */}
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-slate-950/90 border border-slate-700 rounded-full px-6 py-3 flex items-center gap-6 shadow-2xl backdrop-blur-md z-20">
+                <div className="absolute bottom-6 left-1/2 opacity-0 group-hover:opacity-100 transition-opacity -translate-x-1/2 bg-slate-950/90 border border-slate-700 rounded-full px-6 py-3 flex items-center gap-6 shadow-2xl backdrop-blur-md z-20">
                   <button
                     onClick={() => {
                       startRun(config);
