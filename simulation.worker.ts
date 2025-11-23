@@ -225,9 +225,11 @@ function setupWorld(population: Individual[]) {
                 let spreadOffset = 0;
                 let spreadAxis = 0;
 
-                if (axisIdx === 0) spreadAxis = 2;
-                else if (axisIdx === 1) spreadAxis = 0;
-                else spreadAxis = 0;
+                // Determine tangential axes for offsets
+                let uAxis = 0, vAxis = 0;
+                if (axisIdx === 0) { uAxis = 1; vAxis = 2; spreadAxis = 2; } // Face X -> Y, Z
+                else if (axisIdx === 1) { uAxis = 0; vAxis = 2; spreadAxis = 0; } // Face Y -> X, Z
+                else { uAxis = 0; vAxis = 1; spreadAxis = 0; } // Face Z -> X, Y
 
                 if (countInFace > 1) {
                     const parentDim = parentBlock.size[spreadAxis];
@@ -247,11 +249,31 @@ function setupWorld(population: Individual[]) {
                 if (spreadAxis === 1) a1.y += spreadOffset;
                 if (spreadAxis === 2) a1.z += spreadOffset;
 
+                // Apply Parent Offset
+                const pOffset = child.parentOffset || [0, 0];
+                if (uAxis === 0) a1.x += pOffset[0];
+                if (uAxis === 1) a1.y += pOffset[0];
+                if (uAxis === 2) a1.z += pOffset[0];
+
+                if (vAxis === 0) a1.x += pOffset[1];
+                if (vAxis === 1) a1.y += pOffset[1];
+                if (vAxis === 2) a1.z += pOffset[1];
+
                 // a2 is offset from child center
                 let a2 = { x: 0, y: 0, z: 0 };
                 if (axisIdx === 0) a2.x = -childHalf * dir;
                 if (axisIdx === 1) a2.y = -childHalf * dir;
                 if (axisIdx === 2) a2.z = -childHalf * dir;
+
+                // Apply Child Offset
+                const cOffset = child.childOffset || [0, 0];
+                if (uAxis === 0) a2.x -= cOffset[0];
+                if (uAxis === 1) a2.y -= cOffset[0];
+                if (uAxis === 2) a2.z -= cOffset[0];
+
+                if (vAxis === 0) a2.x -= cOffset[1];
+                if (vAxis === 1) a2.y -= cOffset[1];
+                if (vAxis === 2) a2.z -= cOffset[1];
 
                 // Child World Pos = Parent World Pos + a1 - a2
                 // (Assuming no rotation initially)
@@ -321,9 +343,11 @@ function setupWorld(population: Individual[]) {
                 let spreadOffset = 0;
                 let spreadAxis = 0;
 
-                if (axisIdx === 0) spreadAxis = 2;
-                else if (axisIdx === 1) spreadAxis = 0;
-                else spreadAxis = 0;
+                // Determine tangential axes for offsets
+                let uAxis = 0, vAxis = 0;
+                if (axisIdx === 0) { uAxis = 1; vAxis = 2; spreadAxis = 2; } // Face X -> Y, Z
+                else if (axisIdx === 1) { uAxis = 0; vAxis = 2; spreadAxis = 0; } // Face Y -> X, Z
+                else { uAxis = 0; vAxis = 1; spreadAxis = 0; } // Face Z -> X, Y
 
                 if (countInFace > 1) {
                     const parentDim = parentBlock.size[spreadAxis];
@@ -341,10 +365,30 @@ function setupWorld(population: Individual[]) {
                 if (spreadAxis === 1) a1.y += spreadOffset;
                 if (spreadAxis === 2) a1.z += spreadOffset;
 
+                // Apply Parent Offset
+                const pOffset = block.parentOffset || [0, 0];
+                if (uAxis === 0) a1.x += pOffset[0];
+                if (uAxis === 1) a1.y += pOffset[0];
+                if (uAxis === 2) a1.z += pOffset[0];
+
+                if (vAxis === 0) a1.x += pOffset[1];
+                if (vAxis === 1) a1.y += pOffset[1];
+                if (vAxis === 2) a1.z += pOffset[1];
+
                 let a2 = { x: 0, y: 0, z: 0 };
                 if (axisIdx === 0) a2.x = -childHalf * dir;
                 if (axisIdx === 1) a2.y = -childHalf * dir;
                 if (axisIdx === 2) a2.z = -childHalf * dir;
+
+                // Apply Child Offset
+                const cOffset = block.childOffset || [0, 0];
+                if (uAxis === 0) a2.x -= cOffset[0];
+                if (uAxis === 1) a2.y -= cOffset[0];
+                if (uAxis === 2) a2.z -= cOffset[0];
+
+                if (vAxis === 0) a2.x -= cOffset[1];
+                if (vAxis === 1) a2.y -= cOffset[1];
+                if (vAxis === 2) a2.z -= cOffset[1];
 
                 let axis;
                 if (block.jointType === JointType.SPHERICAL) {

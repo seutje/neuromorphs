@@ -17,6 +17,8 @@ export interface BlockNode {
     amp: number;
   };
   attachFace: number; // 0..5: +x, -x, +y, -y, +z, -z
+  parentOffset?: [number, number]; // Offset on parent face [u, v]
+  childOffset?: [number, number]; // Offset on child face [u, v]
 }
 
 // Neural Network Definitions

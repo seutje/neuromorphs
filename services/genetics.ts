@@ -36,13 +36,60 @@ const generateRandomMorphology = (nodeCount: number): BlockNode[] => {
       }
     }
 
+    const attachFace = Math.floor(random() * 6);
+    let parentOffset: [number, number] = [0, 0];
+    let childOffset: [number, number] = [0, 0];
+
+    if (parentId !== undefined) {
+      const parent = nodes[parentId];
+      const axisIdx = Math.floor(attachFace / 2);
+      let uAxis = 0, vAxis = 0;
+      if (axisIdx === 0) { uAxis = 1; vAxis = 2; }
+      else if (axisIdx === 1) { uAxis = 0; vAxis = 2; }
+      else { uAxis = 0; vAxis = 1; }
+
+      // Current node size is not yet defined in the array, but we are defining it now.
+      // We need to generate size first.
+    }
+
+    const size: [number, number, number] = [
+      0.4 + random() * 0.4,
+      0.2 + random() * 0.3,
+      0.2 + random() * 0.3
+    ];
+
+    if (parentId !== undefined) {
+      const parent = nodes[parentId];
+      const axisIdx = Math.floor(attachFace / 2);
+      let uAxis = 0, vAxis = 0;
+      if (axisIdx === 0) { uAxis = 1; vAxis = 2; }
+      else if (axisIdx === 1) { uAxis = 0; vAxis = 2; }
+      else { uAxis = 0; vAxis = 1; }
+
+      const parentLimitU = parent.size[uAxis] / 2;
+      const parentLimitV = parent.size[vAxis] / 2;
+      const childLimitU = size[uAxis] / 2;
+      const childLimitV = size[vAxis] / 2;
+
+      parentOffset = [
+        (random() * 0.4 - 0.2),
+        (random() * 0.4 - 0.2)
+      ];
+      childOffset = [
+        (random() * 0.4 - 0.2),
+        (random() * 0.4 - 0.2)
+      ];
+
+      // Clamp
+      parentOffset[0] = Math.max(-parentLimitU, Math.min(parentLimitU, parentOffset[0]));
+      parentOffset[1] = Math.max(-parentLimitV, Math.min(parentLimitV, parentOffset[1]));
+      childOffset[0] = Math.max(-childLimitU, Math.min(childLimitU, childOffset[0]));
+      childOffset[1] = Math.max(-childLimitV, Math.min(childLimitV, childOffset[1]));
+    }
+
     nodes.push({
       id: i,
-      size: [
-        0.4 + random() * 0.4,
-        0.2 + random() * 0.3,
-        0.2 + random() * 0.3
-      ],
+      size: size,
       color: COLORS[i % COLORS.length],
       parentId: parentId,
       jointType: jointType,
@@ -51,7 +98,9 @@ const generateRandomMorphology = (nodeCount: number): BlockNode[] => {
         phase: random() * Math.PI * 2,
         amp: 0.5 + random() * 0.5    // 0.5 to 1.0
       },
-      attachFace: Math.floor(random() * 6) // 0..5
+      attachFace: attachFace,
+      parentOffset: parentId !== undefined ? parentOffset : undefined,
+      childOffset: parentId !== undefined ? childOffset : undefined
     });
   }
   return nodes;
@@ -173,6 +222,44 @@ export const mutateGenome = (genome: Genome, rate: number) => {
       if (block.parentId !== undefined && random() < 0.05) {
         block.attachFace = Math.floor(random() * 6);
       }
+
+      // Mutate Offsets
+      if (block.parentId !== undefined && random() < rate) {
+        const parent = morphology.find(p => p.id === block.parentId);
+        if (parent) {
+          const face = block.attachFace;
+          const axisIdx = Math.floor(face / 2); // 0=x, 1=y, 2=z
+
+          // Determine tangential axes
+          let uAxis = 0, vAxis = 0;
+          if (axisIdx === 0) { uAxis = 1; vAxis = 2; } // Face X -> Y, Z
+          else if (axisIdx === 1) { uAxis = 0; vAxis = 2; } // Face Y -> X, Z
+          else { uAxis = 0; vAxis = 1; } // Face Z -> X, Y
+
+          const parentLimitU = parent.size[uAxis] / 2;
+          const parentLimitV = parent.size[vAxis] / 2;
+          const childLimitU = block.size[uAxis] / 2;
+          const childLimitV = block.size[vAxis] / 2;
+
+          // Mutate Parent Offset
+          if (!block.parentOffset) block.parentOffset = [0, 0];
+          block.parentOffset[0] += (random() * 0.2) - 0.1;
+          block.parentOffset[1] += (random() * 0.2) - 0.1;
+
+          // Clamp Parent Offset
+          block.parentOffset[0] = Math.max(-parentLimitU, Math.min(parentLimitU, block.parentOffset[0]));
+          block.parentOffset[1] = Math.max(-parentLimitV, Math.min(parentLimitV, block.parentOffset[1]));
+
+          // Mutate Child Offset
+          if (!block.childOffset) block.childOffset = [0, 0];
+          block.childOffset[0] += (random() * 0.2) - 0.1;
+          block.childOffset[1] += (random() * 0.2) - 0.1;
+
+          // Clamp Child Offset
+          block.childOffset[0] = Math.max(-childLimitU, Math.min(childLimitU, block.childOffset[0]));
+          block.childOffset[1] = Math.max(-childLimitV, Math.min(childLimitV, block.childOffset[1]));
+        }
+      }
     }
   });
 
@@ -182,14 +269,47 @@ export const mutateGenome = (genome: Genome, rate: number) => {
     const currentMaxId = morphology.reduce((max, n) => Math.max(max, n.id), 0);
     const newId = currentMaxId + 1;
 
+    const attachFace = Math.floor(random() * 6);
+    const size: [number, number, number] = [
+      0.4 + random() * 0.4,
+      0.2 + random() * 0.3,
+      0.2 + random() * 0.3
+    ];
+
+    let parentOffset: [number, number] = [0, 0];
+    let childOffset: [number, number] = [0, 0];
+
+    // Calculate Offsets
+    const axisIdx = Math.floor(attachFace / 2);
+    let uAxis = 0, vAxis = 0;
+    if (axisIdx === 0) { uAxis = 1; vAxis = 2; }
+    else if (axisIdx === 1) { uAxis = 0; vAxis = 2; }
+    else { uAxis = 0; vAxis = 1; }
+
+    const parentLimitU = parent.size[uAxis] / 2;
+    const parentLimitV = parent.size[vAxis] / 2;
+    const childLimitU = size[uAxis] / 2;
+    const childLimitV = size[vAxis] / 2;
+
+    parentOffset = [
+      (random() * 0.4 - 0.2),
+      (random() * 0.4 - 0.2)
+    ];
+    childOffset = [
+      (random() * 0.4 - 0.2),
+      (random() * 0.4 - 0.2)
+    ];
+
+    // Clamp
+    parentOffset[0] = Math.max(-parentLimitU, Math.min(parentLimitU, parentOffset[0]));
+    parentOffset[1] = Math.max(-parentLimitV, Math.min(parentLimitV, parentOffset[1]));
+    childOffset[0] = Math.max(-childLimitU, Math.min(childLimitU, childOffset[0]));
+    childOffset[1] = Math.max(-childLimitV, Math.min(childLimitV, childOffset[1]));
+
     morphology.push({
       id: newId,
       parentId: parent.id,
-      size: [
-        0.4 + random() * 0.4,
-        0.2 + random() * 0.3,
-        0.2 + random() * 0.3
-      ],
+      size: size,
       color: COLORS[newId % COLORS.length],
       jointType: random() > 0.5 ? JointType.REVOLUTE : JointType.SPHERICAL,
       jointParams: {
@@ -197,7 +317,9 @@ export const mutateGenome = (genome: Genome, rate: number) => {
         phase: random() * Math.PI * 2,
         amp: 0.5 + random() * 0.5
       },
-      attachFace: Math.floor(random() * 6)
+      attachFace: attachFace,
+      parentOffset: parentOffset,
+      childOffset: childOffset
     });
 
     // Add Actuator

@@ -159,6 +159,101 @@ export const EditorPropertiesPanel: React.FC<EditorPropertiesPanelProps> = ({
                                         />
                                     </div>
                                 </div>
+
+                                {/* Offsets */}
+                                <div className="space-y-2 pt-2 border-t border-slate-800">
+                                    <h4 className="text-[10px] uppercase font-bold text-slate-500">Attachment Offsets</h4>
+
+                                    {(() => {
+                                        const parentBlock = genome.morphology.find(b => b.id === selectedBlock.parentId);
+                                        if (!parentBlock) return null;
+
+                                        const face = selectedBlock.attachFace;
+                                        const axisIdx = Math.floor(face / 2); // 0=x, 1=y, 2=z
+
+                                        // Determine tangential axes
+                                        let uAxis = 0, vAxis = 0;
+                                        let uLabel = '', vLabel = '';
+
+                                        if (axisIdx === 0) { uAxis = 1; vAxis = 2; uLabel = 'Y'; vLabel = 'Z'; } // Face X -> Y, Z
+                                        else if (axisIdx === 1) { uAxis = 0; vAxis = 2; uLabel = 'X'; vLabel = 'Z'; } // Face Y -> X, Z
+                                        else { uAxis = 0; vAxis = 1; uLabel = 'X'; vLabel = 'Y'; } // Face Z -> X, Y
+
+                                        const parentLimitU = parentBlock.size[uAxis] / 2;
+                                        const parentLimitV = parentBlock.size[vAxis] / 2;
+                                        const childLimitU = selectedBlock.size[uAxis] / 2;
+                                        const childLimitV = selectedBlock.size[vAxis] / 2;
+
+                                        const pOffset = selectedBlock.parentOffset || [0, 0];
+                                        const cOffset = selectedBlock.childOffset || [0, 0];
+
+                                        return (
+                                            <>
+                                                {/* Parent Offset */}
+                                                <div>
+                                                    <label className="text-[10px] text-slate-500 block mb-1">Parent Offset ({uLabel}, {vLabel})</label>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <input
+                                                            type="number"
+                                                            step="0.1"
+                                                            min={-parentLimitU}
+                                                            max={parentLimitU}
+                                                            value={pOffset[0]}
+                                                            onChange={(e) => {
+                                                                const val = Math.max(-parentLimitU, Math.min(parentLimitU, parseFloat(e.target.value)));
+                                                                handleChange('parentOffset', [val, pOffset[1]]);
+                                                            }}
+                                                            className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-sm text-white"
+                                                        />
+                                                        <input
+                                                            type="number"
+                                                            step="0.1"
+                                                            min={-parentLimitV}
+                                                            max={parentLimitV}
+                                                            value={pOffset[1]}
+                                                            onChange={(e) => {
+                                                                const val = Math.max(-parentLimitV, Math.min(parentLimitV, parseFloat(e.target.value)));
+                                                                handleChange('parentOffset', [pOffset[0], val]);
+                                                            }}
+                                                            className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-sm text-white"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {/* Child Offset */}
+                                                <div>
+                                                    <label className="text-[10px] text-slate-500 block mb-1">Child Offset ({uLabel}, {vLabel})</label>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <input
+                                                            type="number"
+                                                            step="0.1"
+                                                            min={-childLimitU}
+                                                            max={childLimitU}
+                                                            value={cOffset[0]}
+                                                            onChange={(e) => {
+                                                                const val = Math.max(-childLimitU, Math.min(childLimitU, parseFloat(e.target.value)));
+                                                                handleChange('childOffset', [val, cOffset[1]]);
+                                                            }}
+                                                            className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-sm text-white"
+                                                        />
+                                                        <input
+                                                            type="number"
+                                                            step="0.1"
+                                                            min={-childLimitV}
+                                                            max={childLimitV}
+                                                            value={cOffset[1]}
+                                                            onChange={(e) => {
+                                                                const val = Math.max(-childLimitV, Math.min(childLimitV, parseFloat(e.target.value)));
+                                                                handleChange('childOffset', [cOffset[0], val]);
+                                                            }}
+                                                            className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-sm text-white"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </>
+                                        );
+                                    })()}
+                                </div>
                             </div>
                         )}
 

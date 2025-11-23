@@ -245,10 +245,11 @@ export const MorphologyVisualizer: React.FC<MorphologyVisualizerProps> = ({ geno
           let spreadOffset = 0;
           let spreadAxis = 0;
 
-          // Select spread axis based on face normal
-          if (axisIdx === 0) spreadAxis = 2; // Face X -> Spread Z
-          else if (axisIdx === 1) spreadAxis = 0; // Face Y -> Spread X
-          else spreadAxis = 0; // Face Z -> Spread X
+          // Determine tangential axes for offsets
+          let uAxis = 0, vAxis = 0;
+          if (axisIdx === 0) { uAxis = 1; vAxis = 2; spreadAxis = 2; } // Face X -> Y, Z
+          else if (axisIdx === 1) { uAxis = 0; vAxis = 2; spreadAxis = 0; } // Face Y -> X, Z
+          else { uAxis = 0; vAxis = 1; spreadAxis = 0; } // Face Z -> X, Y
 
           if (countInFace > 1) {
             const parentDim = parentBlock.size[spreadAxis];
@@ -273,6 +274,16 @@ export const MorphologyVisualizer: React.FC<MorphologyVisualizerProps> = ({ geno
           if (spreadAxis === 1) pivot.position.y += spreadOffset;
           if (spreadAxis === 2) pivot.position.z += spreadOffset;
 
+          // Apply Parent Offset
+          const pOffset = currentBlock.parentOffset || [0, 0];
+          if (uAxis === 0) pivot.position.x += pOffset[0];
+          if (uAxis === 1) pivot.position.y += pOffset[0];
+          if (uAxis === 2) pivot.position.z += pOffset[0];
+
+          if (vAxis === 0) pivot.position.x += pOffset[1];
+          if (vAxis === 1) pivot.position.y += pOffset[1];
+          if (vAxis === 2) pivot.position.z += pOffset[1];
+
           parentMesh.add(pivot);
 
           // Position Child relative to Pivot (extending out)
@@ -281,6 +292,16 @@ export const MorphologyVisualizer: React.FC<MorphologyVisualizerProps> = ({ geno
           if (axisIdx === 0) mesh.position.x = childPos;
           if (axisIdx === 1) mesh.position.y = childPos;
           if (axisIdx === 2) mesh.position.z = childPos;
+
+          // Apply Child Offset
+          const cOffset = currentBlock.childOffset || [0, 0];
+          if (uAxis === 0) mesh.position.x -= cOffset[0];
+          if (uAxis === 1) mesh.position.y -= cOffset[0];
+          if (uAxis === 2) mesh.position.z -= cOffset[0];
+
+          if (vAxis === 0) mesh.position.x -= cOffset[1];
+          if (vAxis === 1) mesh.position.y -= cOffset[1];
+          if (vAxis === 2) mesh.position.z -= cOffset[1];
 
           pivot.add(mesh);
 

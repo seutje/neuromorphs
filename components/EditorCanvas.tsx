@@ -175,9 +175,11 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({ genome, selectedBloc
                     let spreadOffset = 0;
                     let spreadAxis = 0;
 
-                    if (axisIdx === 0) spreadAxis = 2;
-                    else if (axisIdx === 1) spreadAxis = 0;
-                    else spreadAxis = 0;
+                    // Determine tangential axes for offsets
+                    let uAxis = 0, vAxis = 0;
+                    if (axisIdx === 0) { uAxis = 1; vAxis = 2; spreadAxis = 2; } // Face X -> Y, Z
+                    else if (axisIdx === 1) { uAxis = 0; vAxis = 2; spreadAxis = 0; } // Face Y -> X, Z
+                    else { uAxis = 0; vAxis = 1; spreadAxis = 0; } // Face Z -> X, Y
 
                     if (countInFace > 1) {
                         const parentDim = parentBlock.size[spreadAxis];
@@ -194,9 +196,20 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({ genome, selectedBloc
                     if (axisIdx === 1) pivot.position.y = pivotPos;
                     if (axisIdx === 2) pivot.position.z = pivotPos;
 
+                    // Apply Spread (legacy auto-layout)
                     if (spreadAxis === 0) pivot.position.x += spreadOffset;
                     if (spreadAxis === 1) pivot.position.y += spreadOffset;
                     if (spreadAxis === 2) pivot.position.z += spreadOffset;
+
+                    // Apply Parent Offset
+                    const pOffset = currentBlock.parentOffset || [0, 0];
+                    if (uAxis === 0) pivot.position.x += pOffset[0];
+                    if (uAxis === 1) pivot.position.y += pOffset[0];
+                    if (uAxis === 2) pivot.position.z += pOffset[0];
+
+                    if (vAxis === 0) pivot.position.x += pOffset[1];
+                    if (vAxis === 1) pivot.position.y += pOffset[1];
+                    if (vAxis === 2) pivot.position.z += pOffset[1];
 
                     parentMesh.add(pivot);
 
@@ -205,6 +218,21 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({ genome, selectedBloc
                     if (axisIdx === 0) mesh.position.x = childPos;
                     if (axisIdx === 1) mesh.position.y = childPos;
                     if (axisIdx === 2) mesh.position.z = childPos;
+
+                    // Apply Child Offset
+                    const cOffset = currentBlock.childOffset || [0, 0];
+                    // Note: Child offset moves the mesh relative to the pivot.
+                    // The pivot is at the attachment point on the parent.
+                    // The mesh is initially positioned so its face touches the pivot.
+                    // We need to move the mesh along its tangential axes.
+
+                    if (uAxis === 0) mesh.position.x -= cOffset[0];
+                    if (uAxis === 1) mesh.position.y -= cOffset[0];
+                    if (uAxis === 2) mesh.position.z -= cOffset[0];
+
+                    if (vAxis === 0) mesh.position.x -= cOffset[1];
+                    if (vAxis === 1) mesh.position.y -= cOffset[1];
+                    if (vAxis === 2) mesh.position.z -= cOffset[1];
 
                     pivot.add(mesh);
 
