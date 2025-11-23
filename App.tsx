@@ -360,7 +360,7 @@ function App() {
         <div className="lg:col-span-8 flex flex-col gap-6 h-full overflow-y-auto lg:overflow-hidden">
 
           {/* 3D Viewport Container */}
-          <div className="flex-1 min-h-[38vh] bg-slate-900 rounded-xl border border-slate-800 relative flex flex-col group">
+          <div className="flex-1 min-h-[calc(45vh-64px)] bg-slate-900 rounded-xl border border-slate-800 relative flex flex-col group">
             {viewMode === 'SIMULATION' ? (
               <>
                 <WorldView
