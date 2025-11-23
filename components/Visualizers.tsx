@@ -38,8 +38,10 @@ export const BrainVisualizer: React.FC<BrainVisualizerProps> = ({ genome, active
         const ty = target.y * canvas.height;
 
         // Pulse effect if active
+        // Pulse effect if active
         const pulse = active ? Math.sin(time * 0.005 + (Math.abs(conn.weight) * 10)) : 0;
-        const alpha = Math.min(1, Math.abs(conn.weight) + 0.2 + (pulse * 0.2));
+        // Ensure minimum visibility
+        const alpha = Math.max(0.3, Math.min(1, Math.abs(conn.weight) + 0.2 + (pulse * 0.2)));
 
         ctx.beginPath();
         ctx.moveTo(sx, sy);
@@ -47,7 +49,9 @@ export const BrainVisualizer: React.FC<BrainVisualizerProps> = ({ genome, active
         ctx.strokeStyle = conn.weight > 0
           ? `rgba(52, 211, 153, ${alpha})` // Green positive
           : `rgba(244, 63, 94, ${alpha})`; // Red negative
-        ctx.lineWidth = Math.abs(conn.weight) * 2;
+
+        // Minimum line width of 1px, scale up with weight
+        ctx.lineWidth = Math.max(1, Math.abs(conn.weight) * 4);
         ctx.stroke();
       });
 
