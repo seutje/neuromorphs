@@ -1,20 +1,78 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# NeuroMorphs
 
-# Run and deploy your AI Studio app
+**NeuroMorphs** is a browser-based evolution simulation inspired by Karl Sims' "Evolved Virtual Creatures". It uses a genetic algorithm to evolve 3D block-based creatures that learn to walk, run, or crawl within a physics simulation.
 
-This contains everything you need to run your app locally.
+## 🚀 Getting Started
 
-View your app in AI Studio: https://ai.studio/apps/drive/1lcbZf2VA1zhVybNRFRuXKgEBOZLpToSR
+### Prerequisites
+- **Node.js** (v16 or higher)
 
-## Run Locally
+### Installation & Running
 
-**Prerequisites:**  Node.js
+1.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
 
+2.  **Start the development server:**
+    ```bash
+    npm run dev
+    ```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+3.  **Open your browser:**
+    Navigate to `http://localhost:5173` (or the URL shown in your terminal).
+
+---
+
+## 🧠 How It Works
+
+NeuroMorphs combines three core systems: **Morphology Generation**, **Physics Simulation**, and **Evolutionary Optimization**.
+
+### 1. Creature Morphology (Genotype)
+Each creature is defined by a **Genome** which acts as a blueprint for its body and control system.
+- **Recursive Block Structure**: Creatures start with a root block. Child blocks are recursively attached to the faces (X, Y, Z) of parent blocks.
+- **Joints**: Blocks are connected via physical joints.
+    - **Revolute Joints**: Hinge-like movement (1 Degree of Freedom).
+    - **Spherical Joints**: Ball-and-socket movement (3 Degrees of Freedom).
+- **Genetics**: Properties like block size, color, joint type, and motor limits are encoded in the genome and subject to mutation.
+
+### 2. Physics Simulation (Phenotype)
+The simulation is powered by **Rapier3D** (via `@dimforge/rapier3d-compat`) and rendered with **Three.js**.
+- **Rigid Body Dynamics**: Each block is a dynamic rigid body with mass, friction, and restitution.
+- **Motor Control**: Joints are driven by motors. Currently, the simulation uses **Oscillator-Based Control**:
+    - Each joint has an internal sine wave controller: $Target = Amplitude \times \sin(Time \times Speed + Phase)$.
+    - The *Speed*, *Phase*, and *Amplitude* are evolved parameters unique to each joint.
+    - This allows for rhythmic, periodic motion (walking, crawling) without complex sensory feedback (yet).
+- **Neural Network (Future)**: The codebase includes a dormant Neural Network generator (`services/genetics.ts`) capable of creating sensor-actuator graphs. This is laid out for future upgrades to sensor-based reactive control.
+
+### 3. Evolutionary Algorithm
+The system uses a standard genetic algorithm to optimize creatures for **Locomotion** (distance traveled).
+
+1.  **Population Initialization**: A random population of creatures is generated with random morphologies and motor parameters.
+2.  **Evaluation (The Epoch)**:
+    - All creatures are simulated simultaneously in parallel lanes.
+    - **Fitness Function**: $Fitness = Max(Position_X)$. Creatures that move further along the track get higher scores.
+    - **Disqualification**: Creatures that explode (velocity > threshold) or fall off the map are penalized.
+3.  **Selection & Reproduction**:
+    - **Elitism**: The top 10% of performers are copied directly to the next generation.
+    - **Tournament Selection**: Two random creatures are picked, and the better one becomes a parent.
+    - **Mutation**: Offspring genomes are mutated:
+        - *Parameter Mutation*: Tweaking joint speed, phase, or block size.
+        - *Structural Mutation*: Adding or removing blocks (growth/pruning).
+4.  **Next Generation**: The new population replaces the old one, and the cycle repeats.
+
+---
+
+## 🛠️ Tech Stack
+
+- **Frontend Framework**: React (Vite)
+- **3D Rendering**: Three.js / React Three Fiber concepts (implemented in vanilla Three.js for performance)
+- **Physics Engine**: Rapier3D (WASM-based for high performance)
+- **Styling**: Tailwind CSS
+- **Icons**: Lucide React
+
+## 📂 Project Structure
+
+- `components/WorldView.tsx`: The core simulation loop. Handles Three.js scene setup, Rapier physics stepping, and synchronizing visuals with physics bodies.
+- `services/genetics.ts`: Contains the genetic algorithm logic (crossover, mutation, genome generation).
+- `types.ts`: TypeScript definitions for Genomes, Individuals, and Neural Networks.
