@@ -9,6 +9,7 @@ interface BrainPropertiesPanelProps {
     onDeleteNode: (id: string) => void;
     onUpdateConnection: (sourceId: string, targetId: string, weight: number) => void;
     onAddConnection: (sourceId: string, targetId: string) => void;
+    onDeleteConnection: (sourceId: string, targetId: string) => void;
 }
 
 export const BrainPropertiesPanel: React.FC<BrainPropertiesPanelProps> = ({
@@ -17,7 +18,8 @@ export const BrainPropertiesPanel: React.FC<BrainPropertiesPanelProps> = ({
     onAddNode,
     onDeleteNode,
     onUpdateConnection,
-    onAddConnection
+    onAddConnection,
+    onDeleteConnection
 }) => {
     const selectedNode = genome.brain.nodes.find(n => n.id === selectedNodeId);
     const [newNodeType, setNewNodeType] = useState<NodeType>(NodeType.OSCILLATOR);
@@ -56,13 +58,15 @@ export const BrainPropertiesPanel: React.FC<BrainPropertiesPanelProps> = ({
                                 <div className="text-sm font-bold text-white">{selectedNode.label}</div>
                                 <div className="text-xs font-mono text-slate-500">{selectedNode.type}</div>
                             </div>
-                            <button
-                                onClick={() => onDeleteNode(selectedNode.id)}
-                                className="text-red-400 hover:text-red-300 p-1 hover:bg-red-400/10 rounded transition-colors"
-                                title="Delete Node"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                            </button>
+                            {selectedNode.type !== NodeType.SENSOR && (
+                                <button
+                                    onClick={() => onDeleteNode(selectedNode.id)}
+                                    className="text-red-400 hover:text-red-300 p-1 hover:bg-red-400/10 rounded transition-colors"
+                                    title="Delete Node"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            )}
                         </div>
 
                         {/* Outgoing Connections */}
@@ -82,7 +86,16 @@ export const BrainPropertiesPanel: React.FC<BrainPropertiesPanelProps> = ({
                                                 <ArrowRight className="w-3 h-3" />
                                                 {target?.label || conn.target}
                                             </span>
-                                            <span className="text-xs font-mono text-emerald-400">{conn.weight.toFixed(2)}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-mono text-emerald-400">{conn.weight.toFixed(2)}</span>
+                                                <button
+                                                    onClick={() => onDeleteConnection(conn.source, conn.target)}
+                                                    className="text-slate-500 hover:text-red-400 transition-colors"
+                                                    title="Remove Connection"
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </button>
+                                            </div>
                                         </div>
                                         <input
                                             type="range"

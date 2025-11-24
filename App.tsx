@@ -461,6 +461,16 @@ function App() {
     addToBrainHistory(newGenome, 'Added Connection');
   };
 
+  const handleDeleteConnection = (source: string, target: string) => {
+    if (!editedGenome) return;
+    const newConnections = editedGenome.brain.connections.filter(c =>
+      !(c.source === source && c.target === target)
+    );
+    const newBrain = { ...editedGenome.brain, connections: newConnections };
+    const newGenome = { ...editedGenome, brain: newBrain };
+    addToBrainHistory(newGenome, 'Deleted Connection');
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-emerald-500/30">
 
@@ -639,8 +649,8 @@ function App() {
                 <button
                   onClick={() => setEditorMode('MORPHOLOGY')}
                   className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${editorMode === 'MORPHOLOGY'
-                      ? 'bg-slate-800 text-emerald-400 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-300'
+                    ? 'bg-slate-800 text-emerald-400 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-300'
                     }`}
                 >
                   <Box className="w-4 h-4" />
@@ -649,8 +659,8 @@ function App() {
                 <button
                   onClick={() => setEditorMode('BRAIN')}
                   className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${editorMode === 'BRAIN'
-                      ? 'bg-slate-800 text-emerald-400 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-300'
+                    ? 'bg-slate-800 text-emerald-400 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-300'
                     }`}
                 >
                   <Brain className="w-4 h-4" />
@@ -675,6 +685,7 @@ function App() {
                   onDeleteNode={handleDeleteBrainNode}
                   onUpdateConnection={handleUpdateConnection}
                   onAddConnection={handleAddConnection}
+                  onDeleteConnection={handleDeleteConnection}
                 />
               )}
             </div>
