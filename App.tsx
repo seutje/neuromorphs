@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Pause, FastForward, RefreshCw, Settings, Share2, Trophy, Activity, MousePointer2, PenTool } from 'lucide-react';
-import { Individual, GenerationStats, SimulationConfig } from './types';
+import { Individual, GenerationStats, SimulationConfig, SceneType } from './types';
 import { generateIndividual, evolvePopulation, setSeed, mutateGenome } from './services/genetics';
 import { WorldView } from './components/WorldView';
 import { StatsPanel } from './components/StatsPanel';
@@ -20,6 +20,7 @@ const INITIAL_CONFIG: SimulationConfig = {
   epochDuration: 60, // Seconds
   task: 'LOCOMOTION',
   seed: Math.floor(Math.random() * 100000),
+  scene: SceneType.EARTH
 };
 
 function App() {
@@ -430,6 +431,7 @@ function App() {
                   isPlaying={isPlaying}
                   generation={generation}
                   onTimeUpdate={handleTimeUpdate}
+                  config={config}
                 />
 
                 {/* Hint overlay */}

@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { Individual } from '../types';
+import { Individual, SimulationConfig, SceneType } from '../types';
 import SimulationWorker from '../simulation.worker?worker';
 import { useResizeObserver } from '../hooks/useResizeObserver';
 
@@ -14,6 +14,7 @@ interface WorldViewProps {
   isPlaying: boolean;
   generation: number;
   onTimeUpdate?: (simTime: number) => void;
+  config?: SimulationConfig;
 }
 
 export const WorldView: React.FC<WorldViewProps> = ({
@@ -24,7 +25,8 @@ export const WorldView: React.FC<WorldViewProps> = ({
   simulationSpeed,
   isPlaying,
   generation,
-  onTimeUpdate
+  onTimeUpdate,
+  config
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -303,13 +305,35 @@ export const WorldView: React.FC<WorldViewProps> = ({
     const trackLength = 2000;
     const requiredDepth = Math.max(1000, population.length * laneWidth * 1.2);
 
+    // Visual Config from Scene
+    let groundColor = '#0f172a';
+    let skyColor = '#020617';
+
+    if (config && config.scene) {
+      if (config.scene === SceneType.MOON) {
+        groundColor = '#e2e8f0';
+        skyColor = '#000000';
+      } else if (config.scene === SceneType.JUPITER) {
+        groundColor = '#7c2d12';
+        skyColor = '#451a03';
+      } else if (config.scene === SceneType.WATER) {
+        groundColor = '#0891b2';
+        skyColor = '#0e7490';
+      }
+    }
+
+    // Update Background / Fog
+    sceneRef.current.background = new THREE.Color(skyColor);
+    sceneRef.current.fog = new THREE.FogExp2(skyColor, 0.015);
+
     // Ground
     if (groundMeshRef.current) {
       groundMeshRef.current.geometry.dispose();
       groundMeshRef.current.geometry = new THREE.PlaneGeometry(trackLength, requiredDepth);
+      (groundMeshRef.current.material as THREE.MeshStandardMaterial).color.set(groundColor);
     } else {
       const planeGeo = new THREE.PlaneGeometry(trackLength, requiredDepth);
-      const planeMat = new THREE.MeshStandardMaterial({ color: '#0f172a', roughness: 0.8, metalness: 0.2 });
+      const planeMat = new THREE.MeshStandardMaterial({ color: groundColor, roughness: 0.8, metalness: 0.2 });
       const plane = new THREE.Mesh(planeGeo, planeMat);
       plane.rotation.x = -Math.PI / 2;
       plane.receiveShadow = true;
@@ -323,7 +347,7 @@ export const WorldView: React.FC<WorldViewProps> = ({
       gridHelperRef.current.geometry.dispose();
     }
     const gridSize = Math.max(trackLength, requiredDepth);
-    const grid = new THREE.GridHelper(gridSize, Math.floor(gridSize / 10), '#1e293b', '#0f172a');
+    const grid = new THREE.GridHelper(gridSize, Math.floor(gridSize / 10), '#1e293b', skyColor);
     sceneRef.current.add(grid);
     gridHelperRef.current = grid;
 
@@ -458,7 +482,7 @@ export const WorldView: React.FC<WorldViewProps> = ({
       payload: { population }
     });
 
-  }, [population.length, generation, isPhysicsReady]); // Re-run when population size or generation changes (new pop)
+  }, [population.length, generation, isPhysicsReady, config?.scene]); // Re-run when population size or generation changes (new pop)
 
   // 4. Control Simulation
   useEffect(() => {
@@ -474,6 +498,12 @@ export const WorldView: React.FC<WorldViewProps> = ({
     if (!workerRef.current) return;
     workerRef.current.postMessage({ type: 'UPDATE_SPEED', payload: simulationSpeed });
   }, [simulationSpeed]);
+
+  // 5. Send Config to Worker
+  useEffect(() => {
+    if (!workerRef.current || !config) return;
+    workerRef.current.postMessage({ type: 'SET_CONFIG', payload: config });
+  }, [config?.scene]);
 
   return (
     <div ref={containerRef} className="w-full h-full relative rounded-lg overflow-hidden border border-slate-800 shadow-2xl bg-[#020617] cursor-move">

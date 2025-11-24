@@ -77,4 +77,22 @@ export interface SimulationConfig {
   epochDuration: number; // Seconds
   task: 'LOCOMOTION' | 'JUMP' | 'SWIM';
   seed: number;
+  scene: SceneType;
+}
+
+export enum SceneType {
+  EARTH = 'EARTH',
+  MOON = 'MOON',
+  JUPITER = 'JUPITER',
+  WATER = 'WATER'
+}
+
+export interface SceneConfig {
+  gravity: { x: number; y: number; z: number };
+  friction: number;
+  density: number;
+  drag: number; // Linear damping
+  angularDrag: number; // Angular damping
+  groundColor: string;
+  skyColor: string;
 }

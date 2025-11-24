@@ -1,5 +1,5 @@
 import RAPIER from '@dimforge/rapier3d-compat';
-import { Individual, BlockNode, JointType, NodeType, Genome, NeuralConnection } from './types';
+import { Individual, BlockNode, JointType, NodeType, Genome, NeuralConnection, SceneType, SceneConfig } from './types';
 
 // --- Types ---
 
@@ -30,6 +30,46 @@ interface BrainInstance {
 type Vec3 = { x: number; y: number; z: number };
 type Quat = { x: number; y: number; z: number; w: number };
 
+// --- Scene Configs ---
+const SCENE_CONFIGS: Record<SceneType, SceneConfig> = {
+    [SceneType.EARTH]: {
+        gravity: { x: 0.0, y: -9.81, z: 0.0 },
+        friction: 1.0,
+        density: 2.0,
+        drag: 0.5,
+        angularDrag: 1.0,
+        groundColor: '#0f172a',
+        skyColor: '#020617'
+    },
+    [SceneType.MOON]: {
+        gravity: { x: 0.0, y: -1.62, z: 0.0 },
+        friction: 0.8,
+        density: 2.0,
+        drag: 0.1,
+        angularDrag: 0.2,
+        groundColor: '#e2e8f0',
+        skyColor: '#000000'
+    },
+    [SceneType.JUPITER]: {
+        gravity: { x: 0.0, y: -24.79, z: 0.0 },
+        friction: 1.2,
+        density: 3.0,
+        drag: 2.0,
+        angularDrag: 3.0,
+        groundColor: '#7c2d12',
+        skyColor: '#451a03'
+    },
+    [SceneType.WATER]: {
+        gravity: { x: 0.0, y: -1.0, z: 0.0 }, // Effective gravity (buoyancy offset)
+        friction: 0.5,
+        density: 1.0,
+        drag: 5.0,
+        angularDrag: 5.0,
+        groundColor: '#0891b2',
+        skyColor: '#0e7490'
+    }
+};
+
 // --- State ---
 
 let world: RAPIER.World | null = null;
@@ -43,6 +83,7 @@ let isRunning = false;
 let simulationSpeed = 1;
 let simTime = 0;
 let lastTime = 0;
+let currentScene: SceneType = SceneType.EARTH;
 
 // --- Helpers ---
 
@@ -197,6 +238,29 @@ self.onmessage = async (e) => {
         case 'UPDATE_SPEED':
             simulationSpeed = payload;
             break;
+
+        case 'SET_CONFIG':
+            if (payload.scene && payload.scene !== currentScene) {
+                currentScene = payload.scene;
+                // If we have a population, we might need to re-setup world or just update gravity
+                // For simplicity, let's just update gravity if world exists, but full re-setup is safer for friction/drag changes
+                // However, re-setup kills state. Ideally we update parameters live or restart.
+                // The user usually changes settings then restarts.
+                // Let's just update gravity for now if world exists, but friction/drag requires body iteration.
+                if (world) {
+                    const config = SCENE_CONFIGS[currentScene];
+                    world.gravity = config.gravity;
+
+                    // Update all bodies
+                    physObjects.forEach(obj => {
+                        if (obj.body.isValid()) {
+                            obj.body.setLinearDamping(config.drag);
+                            obj.body.setAngularDamping(config.angularDrag);
+                        }
+                    });
+                }
+            }
+            break;
     }
 };
 
@@ -214,8 +278,8 @@ function setupWorld(population: Individual[]) {
         world = null;
     }
 
-    const gravity = { x: 0.0, y: -9.81, z: 0.0 };
-    world = new RAPIER.World(gravity);
+    const sceneConfig = SCENE_CONFIGS[currentScene];
+    world = new RAPIER.World(sceneConfig.gravity);
 
     // Ground
     const laneWidth = 3.0;
