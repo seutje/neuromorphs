@@ -42,6 +42,7 @@ function App() {
   const [population, setPopulation] = useState<Individual[]>([]);
   const [editedGenome, setEditedGenome] = useState<Individual['genome'] | null>(null);
   const [selectedBlockId, setSelectedBlockId] = useState<number | null>(null);
+  const [runId, setRunId] = useState(0);
 
   // Editor History State
   const [editHistory, setEditHistory] = useState<{ genome: Genome; description: string; timestamp: number }[]>([]);
@@ -91,12 +92,13 @@ function App() {
     lastFrameTimeRef.current = Date.now();
     epochTimeAccumulatorRef.current = 0;
     lastTimerUpdateRef.current = Date.now();
+    setRunId(prev => prev + 1);
   };
 
   const handleSettingsApply = (newConfig: SimulationConfig) => {
     setConfig(newConfig);
     setIsSettingsOpen(false);
-    setIsPlaying(false);
+    setIsPlaying(true);
     startRun(newConfig);
   };
 
@@ -249,6 +251,7 @@ function App() {
     lastFrameTimeRef.current = Date.now();
     epochTimeAccumulatorRef.current = 0;
     lastTimerUpdateRef.current = Date.now();
+    setRunId(prev => prev + 1);
 
     setViewMode('SIMULATION');
     setIsPlaying(true);
@@ -432,6 +435,7 @@ function App() {
                   generation={generation}
                   onTimeUpdate={handleTimeUpdate}
                   config={config}
+                  runId={runId}
                 />
 
                 {/* Hint overlay */}

@@ -15,6 +15,7 @@ interface WorldViewProps {
   generation: number;
   onTimeUpdate?: (simTime: number) => void;
   config?: SimulationConfig;
+  runId: number;
 }
 
 export const WorldView: React.FC<WorldViewProps> = ({
@@ -26,7 +27,8 @@ export const WorldView: React.FC<WorldViewProps> = ({
   isPlaying,
   generation,
   onTimeUpdate,
-  config
+  config,
+  runId
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -482,7 +484,7 @@ export const WorldView: React.FC<WorldViewProps> = ({
       payload: { population }
     });
 
-  }, [population.length, generation, isPhysicsReady, config?.scene]); // Re-run when population size or generation changes (new pop)
+  }, [population.length, generation, isPhysicsReady, config?.scene, runId]); // Re-run when population size or generation changes (new pop)
 
   // 4. Control Simulation
   useEffect(() => {
