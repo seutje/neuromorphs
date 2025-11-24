@@ -274,8 +274,51 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({ genome, selectedBloc
                 </div>
             </div>
 
-            {/* Presets Dropdown */}
-            <div className="absolute top-4 right-4 z-10">
+            {/* Presets and I/O */}
+            <div className="absolute top-4 right-4 z-10 flex gap-2">
+                <div className="flex gap-1">
+                    <button
+                        className="bg-slate-950/80 backdrop-blur text-xs text-slate-300 px-3 py-1.5 rounded border border-slate-700 hover:border-slate-500 hover:text-white transition-colors"
+                        onClick={() => {
+                            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(genome, null, 2));
+                            const downloadAnchorNode = document.createElement('a');
+                            downloadAnchorNode.setAttribute("href", dataStr);
+                            downloadAnchorNode.setAttribute("download", "creature.json");
+                            document.body.appendChild(downloadAnchorNode); // required for firefox
+                            downloadAnchorNode.click();
+                            downloadAnchorNode.remove();
+                        }}
+                        title="Export Creature"
+                    >
+                        Export
+                    </button>
+                    <label className="bg-slate-950/80 backdrop-blur text-xs text-slate-300 px-3 py-1.5 rounded border border-slate-700 hover:border-slate-500 hover:text-white transition-colors cursor-pointer">
+                        Import
+                        <input
+                            type="file"
+                            className="hidden"
+                            accept=".json"
+                            onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                    try {
+                                        const json = JSON.parse(event.target?.result as string);
+                                        // Basic validation could go here
+                                        onLoadPreset(json);
+                                    } catch (err) {
+                                        console.error("Failed to load creature:", err);
+                                        alert("Invalid creature file");
+                                    }
+                                };
+                                reader.readAsText(file);
+                                e.target.value = ''; // Reset
+                            }}
+                        />
+                    </label>
+                </div>
+
                 <select
                     className="bg-slate-950/80 backdrop-blur text-xs text-slate-300 px-3 py-1.5 rounded border border-slate-700 hover:border-slate-500 transition-colors cursor-pointer outline-none focus:ring-1 focus:ring-blue-500"
                     onChange={(e) => {
