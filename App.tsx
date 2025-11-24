@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, Pause, FastForward, RefreshCw, Settings, Share2, Trophy, Activity, MousePointer2, PenTool } from 'lucide-react';
+import { Play, Pause, FastForward, RefreshCw, Settings, Share2, Trophy, Activity, MousePointer2, PenTool, Brain, Box } from 'lucide-react';
 import { Individual, GenerationStats, SimulationConfig, SceneType } from './types';
 import { generateIndividual, evolvePopulation, setSeed, mutateGenome } from './services/genetics';
 import { WorldView } from './components/WorldView';
@@ -9,8 +8,10 @@ import { BrainVisualizer, MorphologyVisualizer } from './components/Visualizers'
 import { SettingsPane } from './components/SettingsPane';
 import { EditorCanvas } from './components/EditorCanvas';
 import { EditorPropertiesPanel } from './components/EditorPropertiesPanel';
+import { BrainEditorCanvas } from './components/BrainEditorCanvas';
+import { BrainPropertiesPanel } from './components/BrainPropertiesPanel';
 import { HistoryPanel } from './components/HistoryPanel';
-import { BlockNode, JointType, Genome } from './types';
+import { BlockNode, JointType, Genome, NodeType, NeuralNode, NeuralConnection } from './types';
 
 // Initial Config
 const INITIAL_CONFIG: SimulationConfig = {
@@ -29,6 +30,7 @@ function App() {
   const [config, setConfig] = useState<SimulationConfig>(INITIAL_CONFIG);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'SIMULATION' | 'EDITOR'>('SIMULATION');
+  const [editorMode, setEditorMode] = useState<'MORPHOLOGY' | 'BRAIN'>('MORPHOLOGY');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
@@ -42,11 +44,16 @@ function App() {
   const [population, setPopulation] = useState<Individual[]>([]);
   const [editedGenome, setEditedGenome] = useState<Individual['genome'] | null>(null);
   const [selectedBlockId, setSelectedBlockId] = useState<number | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [runId, setRunId] = useState(0);
 
   // Editor History State
   const [editHistory, setEditHistory] = useState<{ genome: Genome; description: string; timestamp: number }[]>([]);
   const [historyIndex, setHistoryIndex] = useState(0);
+
+  // Brain Editor History State
+  const [brainEditHistory, setBrainEditHistory] = useState<{ genome: Genome; description: string; timestamp: number }[]>([]);
+  const [brainHistoryIndex, setBrainHistoryIndex] = useState(0);
 
   // Tracking State
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -211,8 +218,11 @@ function App() {
     setEditedGenome(initialGenome);
     setEditHistory([{ genome: initialGenome, description: 'Initial State', timestamp: Date.now() }]);
     setHistoryIndex(0);
+    setBrainEditHistory([{ genome: initialGenome, description: 'Initial Brain State', timestamp: Date.now() }]);
+    setBrainHistoryIndex(0);
 
     setViewMode('EDITOR');
+    setEditorMode('MORPHOLOGY');
   };
 
   const handleStartSimulationFromEditor = () => {
@@ -266,27 +276,68 @@ function App() {
     setEditHistory(newHistory);
     setHistoryIndex(newHistory.length - 1);
     setEditedGenome(newGenome);
+
+    // Sync brain history start point if switching modes, or just let them diverge?
+    // Requirement says: "edit history is separate".
+    // But changes in morphology can affect brain (sensors/actuators).
+    // For now, we will just update the current genome in both histories if needed, 
+    // but the requirement implies two separate undo stacks.
+    // To keep it simple and robust: When we switch modes, we might want to "commit" the state to the other stack?
+    // Or just keep them completely independent but operating on the same object structure.
+    // If I undo in morphology, it reverts the whole genome.
+    // If I undo in brain, it reverts the whole genome.
+    // This is the safest way.
+  };
+
+  const addToBrainHistory = (newGenome: Genome, description: string) => {
+    const newEntry = { genome: newGenome, description, timestamp: Date.now() };
+    const newHistory = brainEditHistory.slice(0, brainHistoryIndex + 1);
+    newHistory.push(newEntry);
+    setBrainEditHistory(newHistory);
+    setBrainHistoryIndex(newHistory.length - 1);
+    setEditedGenome(newGenome);
   };
 
   const handleUndo = () => {
-    if (historyIndex > 0) {
-      const newIndex = historyIndex - 1;
-      setHistoryIndex(newIndex);
-      setEditedGenome(editHistory[newIndex].genome);
+    if (editorMode === 'MORPHOLOGY') {
+      if (historyIndex > 0) {
+        const newIndex = historyIndex - 1;
+        setHistoryIndex(newIndex);
+        setEditedGenome(editHistory[newIndex].genome);
+      }
+    } else {
+      if (brainHistoryIndex > 0) {
+        const newIndex = brainHistoryIndex - 1;
+        setBrainHistoryIndex(newIndex);
+        setEditedGenome(brainEditHistory[newIndex].genome);
+      }
     }
   };
 
   const handleRedo = () => {
-    if (historyIndex < editHistory.length - 1) {
-      const newIndex = historyIndex + 1;
-      setHistoryIndex(newIndex);
-      setEditedGenome(editHistory[newIndex].genome);
+    if (editorMode === 'MORPHOLOGY') {
+      if (historyIndex < editHistory.length - 1) {
+        const newIndex = historyIndex + 1;
+        setHistoryIndex(newIndex);
+        setEditedGenome(editHistory[newIndex].genome);
+      }
+    } else {
+      if (brainHistoryIndex < brainEditHistory.length - 1) {
+        const newIndex = brainHistoryIndex + 1;
+        setBrainHistoryIndex(newIndex);
+        setEditedGenome(brainEditHistory[newIndex].genome);
+      }
     }
   };
 
   const handleJumpToHistory = (index: number) => {
-    setHistoryIndex(index);
-    setEditedGenome(editHistory[index].genome);
+    if (editorMode === 'MORPHOLOGY') {
+      setHistoryIndex(index);
+      setEditedGenome(editHistory[index].genome);
+    } else {
+      setBrainHistoryIndex(index);
+      setEditedGenome(brainEditHistory[index].genome);
+    }
   };
 
   const handleUpdateBlock = (blockId: number, updates: Partial<BlockNode>) => {
@@ -345,6 +396,69 @@ function App() {
     const cloned = JSON.parse(JSON.stringify(presetGenome));
     addToHistory(cloned, 'Loaded Preset');
     setSelectedBlockId(null);
+    // Also reset brain history when loading a full preset
+    setBrainEditHistory([{ genome: cloned, description: 'Loaded Preset', timestamp: Date.now() }]);
+    setBrainHistoryIndex(0);
+  };
+
+  // Brain Editor Handlers
+  const handleAddBrainNode = (type: NodeType, label: string) => {
+    if (!editedGenome) return;
+    const newNode: NeuralNode = {
+      id: `node_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      type,
+      label,
+      activation: 0,
+      x: 0.5 + (Math.random() - 0.5) * 0.2,
+      y: 0.5 + (Math.random() - 0.5) * 0.2
+    };
+
+    const newBrain = {
+      ...editedGenome.brain,
+      nodes: [...editedGenome.brain.nodes, newNode]
+    };
+    const newGenome = { ...editedGenome, brain: newBrain };
+    addToBrainHistory(newGenome, `Added Node: ${label}`);
+    setSelectedNodeId(newNode.id);
+  };
+
+  const handleDeleteBrainNode = (id: string) => {
+    if (!editedGenome) return;
+    const newNodes = editedGenome.brain.nodes.filter(n => n.id !== id);
+    const newConnections = editedGenome.brain.connections.filter(c => c.source !== id && c.target !== id);
+
+    const newBrain = {
+      nodes: newNodes,
+      connections: newConnections
+    };
+    const newGenome = { ...editedGenome, brain: newBrain };
+    addToBrainHistory(newGenome, 'Deleted Node');
+    setSelectedNodeId(null);
+  };
+
+  const handleUpdateConnection = (source: string, target: string, weight: number) => {
+    if (!editedGenome) return;
+    const newConnections = editedGenome.brain.connections.map(c =>
+      (c.source === source && c.target === target) ? { ...c, weight } : c
+    );
+    const newBrain = { ...editedGenome.brain, connections: newConnections };
+    const newGenome = { ...editedGenome, brain: newBrain };
+    addToBrainHistory(newGenome, 'Updated Connection');
+  };
+
+  const handleAddConnection = (source: string, target: string) => {
+    if (!editedGenome) return;
+    const newConn: NeuralConnection = {
+      source,
+      target,
+      weight: Math.random() * 2 - 1
+    };
+    const newBrain = {
+      ...editedGenome.brain,
+      connections: [...editedGenome.brain.connections, newConn]
+    };
+    const newGenome = { ...editedGenome, brain: newBrain };
+    addToBrainHistory(newGenome, 'Added Connection');
   };
 
   return (
@@ -477,12 +591,20 @@ function App() {
               </>
             ) : (
               editedGenome && (
-                <EditorCanvas
-                  genome={editedGenome}
-                  selectedBlockId={selectedBlockId}
-                  onSelectBlock={setSelectedBlockId}
-                  onLoadPreset={handleLoadPreset}
-                />
+                editorMode === 'MORPHOLOGY' ? (
+                  <EditorCanvas
+                    genome={editedGenome}
+                    selectedBlockId={selectedBlockId}
+                    onSelectBlock={setSelectedBlockId}
+                    onLoadPreset={handleLoadPreset}
+                  />
+                ) : (
+                  <BrainEditorCanvas
+                    genome={editedGenome}
+                    selectedNodeId={selectedNodeId}
+                    onSelectNode={setSelectedNodeId}
+                  />
+                )
               )
             )}
           </div>
@@ -494,8 +616,8 @@ function App() {
                 <StatsPanel history={history} />
               ) : (
                 <HistoryPanel
-                  history={editHistory}
-                  currentIndex={historyIndex}
+                  history={editorMode === 'MORPHOLOGY' ? editHistory : brainEditHistory}
+                  currentIndex={editorMode === 'MORPHOLOGY' ? historyIndex : brainHistoryIndex}
                   onUndo={handleUndo}
                   onRedo={handleRedo}
                   onJumpTo={handleJumpToHistory}
@@ -510,15 +632,51 @@ function App() {
 
           {/* Selected Creature Card OR Editor Properties */}
           {viewMode === 'EDITOR' && editedGenome ? (
-            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg flex-1 overflow-hidden">
-              <EditorPropertiesPanel
-                genome={editedGenome}
-                selectedBlockId={selectedBlockId}
-                onUpdateBlock={handleUpdateBlock}
-                onAddChild={handleAddChild}
-                onDeleteBlock={handleDeleteBlock}
-                onStartSimulation={handleStartSimulationFromEditor}
-              />
+            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg flex-1 overflow-hidden flex flex-col">
+
+              {/* Editor Mode Toggle */}
+              <div className="flex gap-2 mb-4 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                <button
+                  onClick={() => setEditorMode('MORPHOLOGY')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${editorMode === 'MORPHOLOGY'
+                      ? 'bg-slate-800 text-emerald-400 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-300'
+                    }`}
+                >
+                  <Box className="w-4 h-4" />
+                  Morphology
+                </button>
+                <button
+                  onClick={() => setEditorMode('BRAIN')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${editorMode === 'BRAIN'
+                      ? 'bg-slate-800 text-emerald-400 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-300'
+                    }`}
+                >
+                  <Brain className="w-4 h-4" />
+                  Brain
+                </button>
+              </div>
+
+              {editorMode === 'MORPHOLOGY' ? (
+                <EditorPropertiesPanel
+                  genome={editedGenome}
+                  selectedBlockId={selectedBlockId}
+                  onUpdateBlock={handleUpdateBlock}
+                  onAddChild={handleAddChild}
+                  onDeleteBlock={handleDeleteBlock}
+                  onStartSimulation={handleStartSimulationFromEditor}
+                />
+              ) : (
+                <BrainPropertiesPanel
+                  genome={editedGenome}
+                  selectedNodeId={selectedNodeId}
+                  onAddNode={handleAddBrainNode}
+                  onDeleteNode={handleDeleteBrainNode}
+                  onUpdateConnection={handleUpdateConnection}
+                  onAddConnection={handleAddConnection}
+                />
+              )}
             </div>
           ) : (
             <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg">
