@@ -25,8 +25,8 @@ export const BrainEditorCanvas: React.FC<BrainEditorCanvasProps> = ({ genome, se
         };
     };
 
-    // Draw Loop
-    useEffect(() => {
+    // Draw Function
+    const draw = React.useCallback(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
@@ -120,14 +120,21 @@ export const BrainEditorCanvas: React.FC<BrainEditorCanvasProps> = ({ genome, se
             ctx.textAlign = 'center';
             ctx.fillText(node.label || node.id, x, y + 24);
         });
+    }, [nodes, connections, selectedNodeId, hoveredNodeId]);
 
-    }, [genome, selectedNodeId, hoveredNodeId]); // Redraw on changes
+    // Keep a ref to the latest draw function so we can call it from resize observer
+    const drawRef = useRef(draw);
+    useEffect(() => {
+        drawRef.current = draw;
+        draw(); // Draw on data change
+    }, [draw]);
 
     useResizeObserver(containerRef, (width, height) => {
         const canvas = canvasRef.current;
         if (canvas) {
             canvas.width = width;
             canvas.height = height;
+            drawRef.current(); // Draw on resize
         }
     });
 
