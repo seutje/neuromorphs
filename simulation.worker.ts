@@ -80,6 +80,7 @@ let jointsCacheDirty = true;
 let brainStates: Map<string, BrainInstance> = new Map();
 let rootBodies: Map<string, RAPIER.RigidBody> = new Map();
 let disqualified: Set<string> = new Set();
+let transformsBuffer: Float32Array | null = null;
 
 let isRunning = false;
 let simulationSpeed = 1;
@@ -177,6 +178,15 @@ const rebuildJointsCache = () => {
 
     jointsByCreatureCache = map;
     jointsCacheDirty = false;
+};
+
+const ensureTransformsBuffer = () => {
+    const requiredLength = physObjects.length * 7;
+    if (!transformsBuffer || transformsBuffer.length !== requiredLength) {
+        const BufferCtor = typeof SharedArrayBuffer !== 'undefined' ? SharedArrayBuffer : ArrayBuffer;
+        const buffer = new BufferCtor(requiredLength * Float32Array.BYTES_PER_ELEMENT);
+        transformsBuffer = new Float32Array(buffer);
+    }
 };
 
 const updateBrainActivations = (time: number) => {
@@ -503,6 +513,7 @@ function setupWorld(population: Individual[]) {
     });
 
     rebuildJointsCache();
+    ensureTransformsBuffer();
 }
 
 function loop() {
@@ -562,11 +573,21 @@ function loop() {
     // To optimize, we can map object index to array index.
     // Since physObjects is stable (unless population changes), we can just send an array of floats.
     // [x, y, z, qx, qy, qz, qw] per object.
-
-    const data = new Float32Array(physObjects.length * 7);
+    ensureTransformsBuffer();
+    const data = transformsBuffer!;
 
     physObjects.forEach((obj, i) => {
-        if (!obj.body.isValid()) return;
+        const offset = i * 7;
+        if (!obj.body.isValid()) {
+            data[offset] = 0;
+            data[offset + 1] = 0;
+            data[offset + 2] = 0;
+            data[offset + 3] = 0;
+            data[offset + 4] = 0;
+            data[offset + 5] = 0;
+            data[offset + 6] = 0;
+            return;
+        }
 
         // Check disqualification
         if (disqualified.has(obj.id)) {
@@ -601,7 +622,6 @@ function loop() {
             fitnessUpdate[obj.id] = t.x;
         }
 
-        const offset = i * 7;
         data[offset] = t.x;
         data[offset + 1] = t.y;
         data[offset + 2] = t.z;
@@ -619,7 +639,7 @@ function loop() {
             simTime: simTime,
             physicsFps: physicsFps
         }
-    }, { transfer: [data.buffer] });
+    }, [data.buffer]);
 
     // Schedule next loop
     setTimeout(loop, 16);
