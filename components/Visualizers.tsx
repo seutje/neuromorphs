@@ -1,6 +1,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { useResizeObserver } from '../hooks/useResizeObserver';
 import { Genome, NeuralConnection, NeuralNode, BlockNode, NodeType } from '../types';
 
@@ -145,7 +146,7 @@ export const MorphologyVisualizer: React.FC<MorphologyVisualizerProps> = ({ geno
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-    camera.position.set(4, 4, 5);
+    camera.position.set(2.5, 2.5, 2.5);
     camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
@@ -161,13 +162,21 @@ export const MorphologyVisualizer: React.FC<MorphologyVisualizerProps> = ({ geno
     dir.position.set(2, 5, 2);
     scene.add(dir);
 
+    // Controls
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 2.0;
+
     // Animation Loop
     let frameId = 0;
     const animate = () => {
       frameId = requestAnimationFrame(animate);
       if (creatureRef.current) {
-        creatureRef.current.rotation.y += 0.005;
+        // creatureRef.current.rotation.y += 0.005; // Handled by OrbitControls autoRotate
       }
+      controls.update();
       renderer.render(scene, camera);
     };
     animate();
@@ -180,6 +189,7 @@ export const MorphologyVisualizer: React.FC<MorphologyVisualizerProps> = ({ geno
         (container as any).removeChild(rendererRef.current.domElement);
       }
       renderer.dispose();
+      controls.dispose();
     };
   }, []);
 
