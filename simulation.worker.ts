@@ -429,7 +429,9 @@ function loop() {
     }
 
     const now = performance.now();
-    // const dt = (now - lastTime) / 1000; // Not used for fixed step, but could be used for throttling
+    // Calculate Physics FPS
+    const delta = now - lastTime;
+    const physicsFps = delta > 0 ? 1000 / delta : 0;
     lastTime = now;
 
     const fixedTimeStep = 1 / 60;
@@ -534,7 +536,8 @@ function loop() {
         payload: {
             transforms: data,
             fitness: fitnessUpdate,
-            simTime: simTime
+            simTime: simTime,
+            physicsFps: physicsFps
         }
     }, { transfer: [data.buffer] });
 

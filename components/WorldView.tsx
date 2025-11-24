@@ -59,6 +59,13 @@ export const WorldView: React.FC<WorldViewProps> = ({
   const lastFitnessReportRef = useRef(0);
   const onTimeUpdateRef = useRef(onTimeUpdate);
 
+  // FPS Stats
+  const [fpsStats, setFpsStats] = useState({ scene: 0, physics: 0 });
+  const lastFrameTimeRef = useRef(performance.now());
+  const frameCountRef = useRef(0);
+  const lastFpsUpdateRef = useRef(performance.now());
+  const physicsFpsRef = useRef(0);
+
   // Update refs
   useEffect(() => {
     if (selectedId !== selectedIdRef.current) {
@@ -82,7 +89,11 @@ export const WorldView: React.FC<WorldViewProps> = ({
       if (type === 'READY') {
         setIsPhysicsReady(true);
       } else if (type === 'UPDATE') {
-        const { transforms, fitness, simTime } = payload;
+        const { transforms, fitness, simTime, physicsFps } = payload;
+
+        if (physicsFps !== undefined) {
+          physicsFpsRef.current = physicsFps;
+        }
 
         // Report simulation time
         if (simTime !== undefined && onTimeUpdateRef.current) {
@@ -207,6 +218,21 @@ export const WorldView: React.FC<WorldViewProps> = ({
     let reqId = 0;
     const animate = () => {
       reqId = requestAnimationFrame(animate);
+
+      // Calculate Scene FPS
+      const now = performance.now();
+      frameCountRef.current++;
+
+      if (now - lastFpsUpdateRef.current >= 500) {
+        const fps = Math.round((frameCountRef.current * 1000) / (now - lastFpsUpdateRef.current));
+        setFpsStats({
+          scene: fps,
+          physics: Math.round(physicsFpsRef.current)
+        });
+        frameCountRef.current = 0;
+        lastFpsUpdateRef.current = now;
+      }
+
       if (controlsRef.current) controlsRef.current.update();
 
       // Camera Follow
@@ -456,6 +482,19 @@ export const WorldView: React.FC<WorldViewProps> = ({
           INITIALIZING PHYSICS ENGINE...
         </div>
       )}
+
+      {/* Performance Stats */}
+      <div className="absolute top-4 right-4 z-10 bg-slate-900/80 backdrop-blur-sm border border-slate-700 rounded p-2 text-xs font-mono text-slate-300 pointer-events-none select-none">
+        <div className="flex items-center gap-3">
+          <span className={fpsStats.scene < 30 ? 'text-red-400' : 'text-emerald-400'}>
+            FPS: {fpsStats.scene}
+          </span>
+          <span className="text-slate-600">|</span>
+          <span className={fpsStats.physics < 30 ? 'text-red-400' : 'text-blue-400'}>
+            PHYS: {fpsStats.physics}
+          </span>
+        </div>
+      </div>
     </div>
   );
 };
