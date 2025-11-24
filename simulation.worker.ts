@@ -75,6 +75,8 @@ const SCENE_CONFIGS: Record<SceneType, SceneConfig> = {
 let world: RAPIER.World | null = null;
 let physObjects: PhysObject[] = [];
 let physJoints: PhysJoint[] = [];
+let jointsByCreatureCache: Map<string, PhysJoint[]> = new Map();
+let jointsCacheDirty = true;
 let brainStates: Map<string, BrainInstance> = new Map();
 let rootBodies: Map<string, RAPIER.RigidBody> = new Map();
 let disqualified: Set<string> = new Set();
@@ -165,8 +167,20 @@ const buildBrainInstance = (genome: Genome): BrainInstance => {
     return { genome, activations, connectionsByTarget };
 };
 
-const updateBrainActivations = (time: number, jointsByCreature: Map<string, PhysJoint[]>) => {
-    jointsByCreature.forEach((joints, creatureId) => {
+const rebuildJointsCache = () => {
+    const map = new Map<string, PhysJoint[]>();
+    physJoints.forEach(pj => {
+        const list = map.get(pj.individualId) || [];
+        list.push(pj);
+        map.set(pj.individualId, list);
+    });
+
+    jointsByCreatureCache = map;
+    jointsCacheDirty = false;
+};
+
+const updateBrainActivations = (time: number) => {
+    jointsByCreatureCache.forEach((joints, creatureId) => {
         const brain = brainStates.get(creatureId);
         const rootBody = rootBodies.get(creatureId);
 
@@ -270,6 +284,8 @@ function setupWorld(population: Individual[]) {
     disqualified.clear();
     physObjects = [];
     physJoints = [];
+    jointsCacheDirty = true;
+    jointsByCreatureCache = new Map();
     brainStates.clear();
     rootBodies.clear();
 
@@ -485,6 +501,8 @@ function setupWorld(population: Individual[]) {
 
         brainStates.set(ind.id, buildBrainInstance(ind.genome));
     });
+
+    rebuildJointsCache();
 }
 
 function loop() {
@@ -505,18 +523,13 @@ function loop() {
     world.timestep = fixedTimeStep;
 
     const steps = Math.min(5, Math.ceil(simulationSpeed));
-    const jointsByCreature = new Map<string, PhysJoint[]>();
-    physJoints.forEach(pj => {
-        const list = jointsByCreature.get(pj.individualId) || [];
-        list.push(pj);
-        jointsByCreature.set(pj.individualId, list);
-    });
+    if (jointsCacheDirty) rebuildJointsCache();
 
     for (let i = 0; i < steps; i++) {
         simTime += fixedTimeStep;
         const t = simTime;
 
-        updateBrainActivations(t, jointsByCreature);
+        updateBrainActivations(t);
 
         physJoints.forEach(pj => {
             if (!pj.body.isValid() || !pj.parentBody.isValid()) return;
