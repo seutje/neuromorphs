@@ -308,6 +308,9 @@ function setupWorld(population: Individual[]) {
         const startPos = { x: 0, y: 4, z: zPos };
         const bodyMap = new Map<number, RAPIER.RigidBody>();
         const nodes = ind.genome.morphology;
+        const nodeMap = new Map<number, BlockNode>();
+
+        nodes.forEach(node => nodeMap.set(node.id, node));
 
         const parentToChildren = new Map<number, BlockNode[]>();
         nodes.forEach(b => {
@@ -334,7 +337,7 @@ function setupWorld(population: Individual[]) {
         while (queue.length > 0) {
             const parentId = queue.shift()!;
             const parentTransform = transforms.get(parentId)!;
-            const parentBlock = nodes.find(n => n.id === parentId)!;
+            const parentBlock = nodeMap.get(parentId)!;
             const children = parentToChildren.get(parentId) || [];
 
             children.forEach(child => {
@@ -436,7 +439,7 @@ function setupWorld(population: Individual[]) {
 
             const parentBody = bodyMap.get(block.parentId);
             const childBody = bodyMap.get(block.id);
-            const parentBlock = nodes.find(n => n.id === block.parentId);
+            const parentBlock = nodeMap.get(block.parentId);
 
             if (parentBody && childBody && parentBlock) {
                 const pivotPos = pivotPositions.get(block.id);
