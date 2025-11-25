@@ -1,5 +1,5 @@
 import RAPIER from '@dimforge/rapier3d-compat';
-import { Individual, BlockNode, JointType, NodeType, Genome, NeuralConnection, SceneType, SceneConfig } from './types';
+import { Individual, BlockNode, JointType, NodeType, Genome, NeuralConnection, NeuralNode, SceneType, SceneConfig } from './types';
 
 // --- Types ---
 
@@ -25,6 +25,8 @@ interface BrainInstance {
     genome: Genome;
     activations: Record<string, number>;
     connectionsByTarget: Map<string, NeuralConnection[]>;
+    reachableNodeIds: string[];
+    nodesById: Map<string, NeuralNode>;
 }
 
 type Vec3 = { x: number; y: number; z: number };
@@ -154,9 +156,11 @@ const scaleVec = (v: Vec3, s: number): Vec3 => ({ x: v.x * s, y: v.y * s, z: v.z
 const buildBrainInstance = (genome: Genome): BrainInstance => {
     const activations: Record<string, number> = {};
     const connectionsByTarget = new Map<string, NeuralConnection[]>();
+    const nodesById = new Map<string, NeuralNode>();
 
     genome.brain.nodes.forEach(node => {
         activations[node.id] = node.activation || 0;
+        nodesById.set(node.id, node);
     });
 
     genome.brain.connections.forEach(conn => {
@@ -165,7 +169,27 @@ const buildBrainInstance = (genome: Genome): BrainInstance => {
         connectionsByTarget.set(conn.target, list);
     });
 
-    return { genome, activations, connectionsByTarget };
+    const reachable = new Set<string>();
+    const stack = genome.brain.nodes
+        .filter(node => node.type === NodeType.ACTUATOR)
+        .map(node => node.id);
+
+    while (stack.length > 0) {
+        const current = stack.pop()!;
+        if (reachable.has(current)) continue;
+        reachable.add(current);
+
+        const incoming = connectionsByTarget.get(current) || [];
+        incoming.forEach(conn => {
+            if (!reachable.has(conn.source)) stack.push(conn.source);
+        });
+    }
+
+    const reachableNodeIds = genome.brain.nodes
+        .filter(node => reachable.has(node.id))
+        .map(node => node.id);
+
+    return { genome, activations, connectionsByTarget, reachableNodeIds, nodesById };
 };
 
 const rebuildJointsCache = () => {
@@ -208,7 +232,10 @@ const updateBrainActivations = (time: number) => {
         const newActivations: Record<string, number> = {};
         const previousActivations = brain.activations;
 
-        brain.genome.brain.nodes.forEach(node => {
+        brain.reachableNodeIds.forEach(nodeId => {
+            const node = brain.nodesById.get(nodeId);
+            if (!node) return;
+
             switch (node.type) {
                 case NodeType.SENSOR: {
                     if (node.id === 's1') newActivations[node.id] = groundSensor;
