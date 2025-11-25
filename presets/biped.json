@@ -3,59 +3,83 @@
         {
             "id": 0,
             "size": [
-                0.75,
-                1,
-                0.5
+                0.7629758039489389,
+                0.48141570792067795,
+                0.20326902591623366
             ],
-            "color": "#eab308",
-            "attachFace": 0,
+            "color": "#10b981",
+            "rotation": [
+                0,
+                0,
+                0
+            ],
+            "jointType": "REVOLUTE",
             "jointParams": {
-                "speed": 0,
-                "phase": 0,
-                "amp": 0
-            }
+                "speed": 4.216920853126794,
+                "phase": 3.3745077338149265,
+                "amp": 0.8979103759163991
+            },
+            "attachFace": 3
         },
         {
             "id": 1,
             "size": [
-                0.25,
-                1,
-                0.25
+                0.5351640249602497,
+                0.47488206224516033,
+                0.2296908575575799
             ],
-            "color": "#eab308",
+            "color": "#3b82f6",
             "parentId": 0,
+            "rotation": [
+                11.978186024352908,
+                3.429040750488639,
+                -0.043909805826842785
+            ],
+            "jointType": "SPHERICAL",
+            "jointParams": {
+                "speed": 2.5466170732397586,
+                "phase": 4.276121225059542,
+                "amp": 0.8071724162204191
+            },
             "attachFace": 3,
             "parentOffset": [
-                0,
-                0
+                -0.008155073691159476,
+                -0.060428644251078384
             ],
-            "jointType": "REVOLUTE",
-            "jointParams": {
-                "speed": 3,
-                "phase": 0,
-                "amp": 0.8
-            }
+            "childOffset": [
+                0.08166269762441514,
+                0.05871705915778874
+            ]
         },
         {
             "id": 2,
             "size": [
-                0.25,
-                1,
-                0.25
+                0.5024141423404217,
+                0.2799415754619986,
+                0.48034963021054866
             ],
-            "color": "#eab308",
+            "color": "#8b5cf6",
             "parentId": 0,
-            "attachFace": 3,
-            "parentOffset": [
-                0,
-                0
+            "rotation": [
+                14.403453497216105,
+                10.996263856068254,
+                -18.678258303552866
             ],
-            "jointType": "REVOLUTE",
+            "jointType": "SPHERICAL",
             "jointParams": {
-                "speed": 3,
-                "phase": 3.14,
-                "amp": 0.8
-            }
+                "speed": 5.509159888373688,
+                "phase": 6.170743361579924,
+                "amp": 0.993355063907802
+            },
+            "attachFace": 0,
+            "parentOffset": [
+                -0.10640776567161084,
+                -0.011565916519612085
+            ],
+            "childOffset": [
+                0.13410071544349195,
+                0.052067773416638374
+            ]
         }
     ],
     "brain": {
@@ -93,32 +117,117 @@
                 "y": 0.35
             },
             {
+                "id": "h0",
+                "type": "NEURON",
+                "label": "N0",
+                "activation": 0,
+                "x": 0.576806987868622,
+                "y": 0.7395139139611273
+            },
+            {
+                "id": "h1",
+                "type": "NEURON",
+                "label": "N1",
+                "activation": 0,
+                "x": 0.5848275896627456,
+                "y": 0.4644691427703947
+            },
+            {
+                "id": "h2",
+                "type": "NEURON",
+                "label": "N2",
+                "activation": 0,
+                "x": 0.5968091014772654,
+                "y": 0.23225765530951323
+            },
+            {
+                "id": "h3",
+                "type": "NEURON",
+                "label": "N3",
+                "activation": 0,
+                "x": 0.412983053131029,
+                "y": 0.35945283658802507
+            },
+            {
+                "id": "h4",
+                "type": "NEURON",
+                "label": "N4",
+                "activation": 0,
+                "x": 0.5519706965889782,
+                "y": 0.40405755983665587
+            },
+            {
+                "id": "a0",
+                "type": "ACTUATOR",
+                "label": "Joint 0",
+                "activation": 0,
+                "x": 0.9,
+                "y": 0.4
+            },
+            {
                 "id": "a1",
                 "type": "ACTUATOR",
                 "label": "Joint 1",
                 "activation": 0,
                 "x": 0.9,
-                "y": 0.3
-            },
-            {
-                "id": "a2",
-                "type": "ACTUATOR",
-                "label": "Joint 2",
-                "activation": 0,
-                "x": 0.9,
-                "y": 0.7
+                "y": 0.6
             }
         ],
         "connections": [
             {
                 "source": "o1",
-                "target": "a1",
-                "weight": 1
+                "target": "h4",
+                "weight": 0.15176538890227675
+            },
+            {
+                "source": "h4",
+                "target": "h3",
+                "weight": 0.025290196295827627
             },
             {
                 "source": "o1",
-                "target": "a2",
-                "weight": -1
+                "target": "a1",
+                "weight": 0.1709447728935629
+            },
+            {
+                "source": "h2",
+                "target": "h4",
+                "weight": -0.5621662923367694
+            },
+            {
+                "source": "s1",
+                "target": "h1",
+                "weight": 0.8081156014231965
+            },
+            {
+                "source": "h0",
+                "target": "h1",
+                "weight": 0.13824302284047008
+            },
+            {
+                "source": "h4",
+                "target": "a0",
+                "weight": 0.0779210717882961
+            },
+            {
+                "source": "s2",
+                "target": "h0",
+                "weight": 0.2747954505030066
+            },
+            {
+                "source": "s2",
+                "target": "h4",
+                "weight": 0.2908830050146207
+            },
+            {
+                "source": "h4",
+                "target": "a1",
+                "weight": -1.092627242906019
+            },
+            {
+                "source": "h1",
+                "target": "h4",
+                "weight": 0.8276703986339271
             }
         ]
     }
