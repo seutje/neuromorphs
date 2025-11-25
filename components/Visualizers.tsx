@@ -4,7 +4,6 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { useResizeObserver } from '../hooks/useResizeObserver';
 import { Genome, NeuralConnection, NeuralNode, BlockNode, NodeType } from '../types';
-import { resolveNodeLayout } from '../utils/graphLayout';
 
 interface BrainVisualizerProps {
   genome: Genome;
@@ -28,18 +27,16 @@ export const BrainVisualizer: React.FC<BrainVisualizerProps> = ({ genome, active
     const draw = (time: number) => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const positions = resolveNodeLayout(nodes, canvas.width, canvas.height);
-
       // Draw connections
       connections.forEach(conn => {
-        const source = positions[conn.source];
-        const target = positions[conn.target];
+        const source = nodes.find(n => n.id === conn.source);
+        const target = nodes.find(n => n.id === conn.target);
         if (!source || !target) return;
 
-        const sx = source.x;
-        const sy = source.y;
-        const tx = target.x;
-        const ty = target.y;
+        const sx = source.x * canvas.width;
+        const sy = source.y * canvas.height;
+        const tx = target.x * canvas.width;
+        const ty = target.y * canvas.height;
 
         // Pulse effect if active
         // Pulse effect if active
@@ -61,10 +58,8 @@ export const BrainVisualizer: React.FC<BrainVisualizerProps> = ({ genome, active
 
       // Draw Nodes
       nodes.forEach(node => {
-        const position = positions[node.id];
-        if (!position) return;
-
-        const { x, y } = position;
+        const x = node.x * canvas.width;
+        const y = node.y * canvas.height;
 
         ctx.beginPath();
         ctx.arc(x, y, 6, 0, Math.PI * 2);

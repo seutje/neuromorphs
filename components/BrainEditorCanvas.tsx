@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Genome, NodeType } from '../types';
+import { Genome, NeuralNode, NodeType } from '../types';
 import { useResizeObserver } from '../hooks/useResizeObserver';
-import { resolveNodeLayout } from '../utils/graphLayout';
 
 interface BrainEditorCanvasProps {
     genome: Genome;
@@ -33,8 +32,6 @@ export const BrainEditorCanvas: React.FC<BrainEditorCanvasProps> = ({ genome, se
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        const positions = resolveNodeLayout(nodes, canvas.width, canvas.height);
-
         // Clear
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -57,14 +54,14 @@ export const BrainEditorCanvas: React.FC<BrainEditorCanvasProps> = ({ genome, se
 
         // Draw Connections
         connections.forEach(conn => {
-            const source = positions[conn.source];
-            const target = positions[conn.target];
+            const source = nodes.find(n => n.id === conn.source);
+            const target = nodes.find(n => n.id === conn.target);
             if (!source || !target) return;
 
-            const sx = source.x;
-            const sy = source.y;
-            const tx = target.x;
-            const ty = target.y;
+            const sx = source.x * canvas.width;
+            const sy = source.y * canvas.height;
+            const tx = target.x * canvas.width;
+            const ty = target.y * canvas.height;
 
             ctx.beginPath();
             ctx.moveTo(sx, sy);
@@ -91,10 +88,8 @@ export const BrainEditorCanvas: React.FC<BrainEditorCanvasProps> = ({ genome, se
 
         // Draw Nodes
         nodes.forEach(node => {
-            const position = positions[node.id];
-            if (!position) return;
-
-            const { x, y } = position;
+            const x = node.x * canvas.width;
+            const y = node.y * canvas.height;
             const isSelected = node.id === selectedNodeId;
             const isHovered = node.id === hoveredNodeId;
 
@@ -154,14 +149,9 @@ export const BrainEditorCanvas: React.FC<BrainEditorCanvasProps> = ({ genome, se
         const pixelY = y * canvas.height;
 
         let found: string | null = null;
-        const positions = resolveNodeLayout(nodes, canvas.width, canvas.height);
-
         for (const node of nodes) {
-            const position = positions[node.id];
-            if (!position) continue;
-
-            const nx = position.x;
-            const ny = position.y;
+            const nx = node.x * canvas.width;
+            const ny = node.y * canvas.height;
             const dist = Math.sqrt(Math.pow(pixelX - nx, 2) + Math.pow(pixelY - ny, 2));
             if (dist < 15) { // Hit radius
                 found = node.id;
