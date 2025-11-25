@@ -341,6 +341,58 @@ function App() {
     }
   };
 
+  const addActuatorForBlock = (genome: Genome, blockId: number): Genome => {
+    const actuatorId = `a${blockId}`;
+    const actuatorExists = genome.brain.nodes.some(n => n.id === actuatorId);
+    if (actuatorExists) return genome;
+
+    const actuatorCount = genome.brain.nodes.filter(n => n.type === NodeType.ACTUATOR).length;
+    const newTotal = actuatorCount + 1;
+    const newActuator: NeuralNode = {
+      id: actuatorId,
+      type: NodeType.ACTUATOR,
+      label: `Joint ${blockId}`,
+      activation: 0,
+      x: 0.9,
+      y: 0.2 + ((actuatorCount + 1) / (newTotal + 1)) * 0.6
+    };
+
+    const candidateSources = genome.brain.nodes.filter(n => n.type !== NodeType.ACTUATOR);
+    const newConnections = [...genome.brain.connections];
+    if (candidateSources.length > 0) {
+      const source = candidateSources[Math.floor(Math.random() * candidateSources.length)];
+      newConnections.push({
+        source: source.id,
+        target: actuatorId,
+        weight: Math.random() * 2 - 1
+      });
+    }
+
+    return {
+      ...genome,
+      brain: {
+        nodes: [...genome.brain.nodes, newActuator],
+        connections: newConnections
+      }
+    };
+  };
+
+  const removeActuatorsForBlocks = (genome: Genome, blockIds: Set<number>): Genome => {
+    const actuatorIds = new Set(Array.from(blockIds).map(id => `a${id}`));
+    const filteredNodes = genome.brain.nodes.filter(n => !actuatorIds.has(n.id));
+    const filteredConnections = genome.brain.connections.filter(
+      c => !actuatorIds.has(c.source) && !actuatorIds.has(c.target)
+    );
+
+    return {
+      ...genome,
+      brain: {
+        nodes: filteredNodes,
+        connections: filteredConnections
+      }
+    };
+  };
+
   const handleUpdateBlock = (blockId: number, updates: Partial<BlockNode>) => {
     if (!editedGenome) return;
     const newMorphology = editedGenome.morphology.map(b =>
@@ -372,7 +424,8 @@ function App() {
       jointParams: { speed: randomSpeed, phase: randomPhase, amp: randomAmp }
     };
 
-    const newGenome = { ...editedGenome, morphology: [...editedGenome.morphology, newBlock] };
+    let newGenome = { ...editedGenome, morphology: [...editedGenome.morphology, newBlock] };
+    newGenome = addActuatorForBlock(newGenome, newId);
     addToHistory(newGenome, 'Added Child Block');
     setSelectedBlockId(newId);
   };
@@ -388,9 +441,14 @@ function App() {
     findChildren(blockId);
 
     const newMorphology = editedGenome.morphology.filter(b => !toDelete.has(b.id));
-    const newGenome = { ...editedGenome, morphology: newMorphology };
+    let newGenome = { ...editedGenome, morphology: newMorphology };
+    newGenome = removeActuatorsForBlocks(newGenome, toDelete);
     addToHistory(newGenome, 'Deleted Block');
     setSelectedBlockId(null);
+    const removedActuators = new Set(Array.from(toDelete).map(id => `a${id}`));
+    if (selectedNodeId && removedActuators.has(selectedNodeId)) {
+      setSelectedNodeId(null);
+    }
   };
 
   const handleLoadPreset = (presetGenome: Genome) => {
