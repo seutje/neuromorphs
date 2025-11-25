@@ -448,6 +448,14 @@ function App() {
 
   const handleAddConnection = (source: string, target: string) => {
     if (!editedGenome) return;
+
+    // Validate target is not Sensor or Oscillator
+    const targetNode = editedGenome.brain.nodes.find(n => n.id === target);
+    if (targetNode && (targetNode.type === NodeType.SENSOR || targetNode.type === NodeType.OSCILLATOR)) {
+      console.warn("Cannot connect to a Sensor or Oscillator");
+      return;
+    }
+
     const newConn: NeuralConnection = {
       source,
       target,

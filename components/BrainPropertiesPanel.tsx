@@ -33,6 +33,8 @@ export const BrainPropertiesPanel: React.FC<BrainPropertiesPanelProps> = ({
     // Filter available targets (not self, not already connected)
     const availableTargets = genome.brain.nodes.filter(n =>
         n.id !== selectedNodeId &&
+        n.type !== NodeType.SENSOR &&
+        n.type !== NodeType.OSCILLATOR &&
         !outgoingConnections.some(c => c.target === n.id)
     );
 

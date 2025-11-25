@@ -157,7 +157,7 @@ const generateRandomBrain = (morphNodes: number): { nodes: NeuralNode[]; connect
     const source = nodes[Math.floor(random() * nodes.length)];
     const target = nodes[Math.floor(random() * nodes.length)];
 
-    if (source.type !== NodeType.ACTUATOR && target.type !== NodeType.SENSOR && source.id !== target.id) {
+    if (source.type !== NodeType.ACTUATOR && target.type !== NodeType.SENSOR && target.type !== NodeType.OSCILLATOR && source.id !== target.id) {
       connections.push({
         source: source.id,
         target: target.id,
@@ -200,7 +200,7 @@ export const mutateGenome = (genome: Genome, rate: number) => {
   if (random() < rate * 0.5 && brain.nodes.length > 0) {
     const source = brain.nodes[Math.floor(random() * brain.nodes.length)];
     const target = brain.nodes[Math.floor(random() * brain.nodes.length)];
-    if (source && target && source.type !== NodeType.ACTUATOR && target.type !== NodeType.SENSOR && source.id !== target.id) {
+    if (source && target && source.type !== NodeType.ACTUATOR && target.type !== NodeType.SENSOR && target.type !== NodeType.OSCILLATOR && source.id !== target.id) {
       brain.connections.push({
         source: source.id,
         target: target.id,
