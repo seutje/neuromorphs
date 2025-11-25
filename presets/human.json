@@ -1,0 +1,653 @@
+{
+    "morphology": [
+        {
+            "id": 0,
+            "size": [
+                0.65,
+                1.1,
+                0.4
+            ],
+            "color": "#0ea5e9",
+            "rotation": [
+                0,
+                0,
+                0
+            ],
+            "jointType": "REVOLUTE",
+            "jointParams": {
+                "speed": 4.2,
+                "phase": 0.4,
+                "amp": 0.75
+            },
+            "attachFace": 3
+        },
+        {
+            "id": 1,
+            "size": [
+                0.35,
+                0.35,
+                0.35
+            ],
+            "color": "#f59e0b",
+            "parentId": 0,
+            "rotation": [
+                0,
+                0,
+                0
+            ],
+            "jointType": "SPHERICAL",
+            "jointParams": {
+                "speed": 3.2,
+                "phase": 2.1,
+                "amp": 0.5
+            },
+            "attachFace": 2,
+            "parentOffset": [
+                0,
+                0
+            ],
+            "childOffset": [
+                0,
+                0
+            ]
+        },
+        {
+            "id": 2,
+            "size": [
+                0.25,
+                0.65,
+                0.25
+            ],
+            "color": "#22c55e",
+            "parentId": 0,
+            "rotation": [
+                0,
+                0,
+                8
+            ],
+            "jointType": "SPHERICAL",
+            "jointParams": {
+                "speed": 4.6,
+                "phase": 4.15,
+                "amp": 0.9
+            },
+            "attachFace": 3,
+            "parentOffset": [
+                -0.18,
+                0
+            ],
+            "childOffset": [
+                0,
+                0
+            ]
+        },
+        {
+            "id": 3,
+            "size": [
+                0.22,
+                0.55,
+                0.22
+            ],
+            "color": "#16a34a",
+            "parentId": 2,
+            "rotation": [
+                0,
+                0,
+                -6
+            ],
+            "jointType": "REVOLUTE",
+            "jointParams": {
+                "speed": 5.1,
+                "phase": 5.6,
+                "amp": 1.0
+            },
+            "attachFace": 3,
+            "parentOffset": [
+                0,
+                0
+            ],
+            "childOffset": [
+                0,
+                0
+            ]
+        },
+        {
+            "id": 4,
+            "size": [
+                0.28,
+                0.18,
+                0.48
+            ],
+            "color": "#15803d",
+            "parentId": 3,
+            "rotation": [
+                0,
+                0,
+                0
+            ],
+            "jointType": "REVOLUTE",
+            "jointParams": {
+                "speed": 6.2,
+                "phase": 6.05,
+                "amp": 0.6
+            },
+            "attachFace": 3,
+            "parentOffset": [
+                0,
+                0.08
+            ],
+            "childOffset": [
+                0,
+                -0.12
+            ]
+        },
+        {
+            "id": 5,
+            "size": [
+                0.25,
+                0.65,
+                0.25
+            ],
+            "color": "#22c55e",
+            "parentId": 0,
+            "rotation": [
+                0,
+                0,
+                -8
+            ],
+            "jointType": "SPHERICAL",
+            "jointParams": {
+                "speed": 4.6,
+                "phase": 1.8,
+                "amp": 0.9
+            },
+            "attachFace": 3,
+            "parentOffset": [
+                0.18,
+                0
+            ],
+            "childOffset": [
+                0,
+                0
+            ]
+        },
+        {
+            "id": 6,
+            "size": [
+                0.22,
+                0.55,
+                0.22
+            ],
+            "color": "#16a34a",
+            "parentId": 5,
+            "rotation": [
+                0,
+                0,
+                6
+            ],
+            "jointType": "REVOLUTE",
+            "jointParams": {
+                "speed": 5.1,
+                "phase": 2.9,
+                "amp": 1.0
+            },
+            "attachFace": 3,
+            "parentOffset": [
+                0,
+                0
+            ],
+            "childOffset": [
+                0,
+                0
+            ]
+        },
+        {
+            "id": 7,
+            "size": [
+                0.28,
+                0.18,
+                0.48
+            ],
+            "color": "#15803d",
+            "parentId": 6,
+            "rotation": [
+                0,
+                0,
+                0
+            ],
+            "jointType": "REVOLUTE",
+            "jointParams": {
+                "speed": 6.2,
+                "phase": 0.9,
+                "amp": 0.6
+            },
+            "attachFace": 3,
+            "parentOffset": [
+                0,
+                0.08
+            ],
+            "childOffset": [
+                0,
+                -0.12
+            ]
+        },
+        {
+            "id": 8,
+            "size": [
+                0.22,
+                0.55,
+                0.22
+            ],
+            "color": "#ef4444",
+            "parentId": 0,
+            "rotation": [
+                0,
+                0,
+                22
+            ],
+            "jointType": "SPHERICAL",
+            "jointParams": {
+                "speed": 3.8,
+                "phase": 5.4,
+                "amp": 0.8
+            },
+            "attachFace": 0,
+            "parentOffset": [
+                0,
+                0.25
+            ],
+            "childOffset": [
+                0,
+                0
+            ]
+        },
+        {
+            "id": 9,
+            "size": [
+                0.18,
+                0.45,
+                0.18
+            ],
+            "color": "#dc2626",
+            "parentId": 8,
+            "rotation": [
+                0,
+                0,
+                0
+            ],
+            "jointType": "REVOLUTE",
+            "jointParams": {
+                "speed": 4.9,
+                "phase": 1.6,
+                "amp": 0.85
+            },
+            "attachFace": 0,
+            "parentOffset": [
+                0,
+                0
+            ],
+            "childOffset": [
+                0,
+                0
+            ]
+        },
+        {
+            "id": 10,
+            "size": [
+                0.18,
+                0.18,
+                0.3
+            ],
+            "color": "#b91c1c",
+            "parentId": 9,
+            "rotation": [
+                0,
+                0,
+                0
+            ],
+            "jointType": "REVOLUTE",
+            "jointParams": {
+                "speed": 6.0,
+                "phase": 2.25,
+                "amp": 0.7
+            },
+            "attachFace": 0,
+            "parentOffset": [
+                0,
+                -0.05
+            ],
+            "childOffset": [
+                0,
+                0.08
+            ]
+        },
+        {
+            "id": 11,
+            "size": [
+                0.22,
+                0.55,
+                0.22
+            ],
+            "color": "#ef4444",
+            "parentId": 0,
+            "rotation": [
+                0,
+                0,
+                -22
+            ],
+            "jointType": "SPHERICAL",
+            "jointParams": {
+                "speed": 3.8,
+                "phase": 0.9,
+                "amp": 0.8
+            },
+            "attachFace": 1,
+            "parentOffset": [
+                0,
+                0.25
+            ],
+            "childOffset": [
+                0,
+                0
+            ]
+        },
+        {
+            "id": 12,
+            "size": [
+                0.18,
+                0.45,
+                0.18
+            ],
+            "color": "#dc2626",
+            "parentId": 11,
+            "rotation": [
+                0,
+                0,
+                0
+            ],
+            "jointType": "REVOLUTE",
+            "jointParams": {
+                "speed": 4.9,
+                "phase": 3.7,
+                "amp": 0.85
+            },
+            "attachFace": 1,
+            "parentOffset": [
+                0,
+                0
+            ],
+            "childOffset": [
+                0,
+                0
+            ]
+        },
+        {
+            "id": 13,
+            "size": [
+                0.18,
+                0.18,
+                0.3
+            ],
+            "color": "#b91c1c",
+            "parentId": 12,
+            "rotation": [
+                0,
+                0,
+                0
+            ],
+            "jointType": "REVOLUTE",
+            "jointParams": {
+                "speed": 6.0,
+                "phase": 4.35,
+                "amp": 0.7
+            },
+            "attachFace": 1,
+            "parentOffset": [
+                0,
+                -0.05
+            ],
+            "childOffset": [
+                0,
+                0.08
+            ]
+        }
+    ],
+    "brain": {
+        "nodes": [
+            {
+                "id": "s1",
+                "type": "SENSOR",
+                "label": "Gnd Contact",
+                "activation": 0,
+                "x": 0.1,
+                "y": 0.2
+            },
+            {
+                "id": "s2",
+                "type": "SENSOR",
+                "label": "Joint Angle",
+                "activation": 0,
+                "x": 0.1,
+                "y": 0.5
+            },
+            {
+                "id": "s3",
+                "type": "SENSOR",
+                "label": "Velocity",
+                "activation": 0,
+                "x": 0.1,
+                "y": 0.8
+            },
+            {
+                "id": "o1",
+                "type": "OSCILLATOR",
+                "label": "Clock",
+                "activation": 0,
+                "x": 0.1,
+                "y": 0.35
+            },
+            {
+                "id": "h0",
+                "type": "NEURON",
+                "label": "Hip Integrator",
+                "activation": 0,
+                "x": 0.45,
+                "y": 0.2
+            },
+            {
+                "id": "h1",
+                "type": "NEURON",
+                "label": "Spine Rhythm",
+                "activation": 0,
+                "x": 0.45,
+                "y": 0.4
+            },
+            {
+                "id": "h2",
+                "type": "NEURON",
+                "label": "Arm Coupler",
+                "activation": 0,
+                "x": 0.45,
+                "y": 0.6
+            },
+            {
+                "id": "h3",
+                "type": "NEURON",
+                "label": "Stride Timing",
+                "activation": 0,
+                "x": 0.45,
+                "y": 0.8
+            },
+            {
+                "id": "h4",
+                "type": "NEURON",
+                "label": "Hip Output",
+                "activation": 0,
+                "x": 0.65,
+                "y": 0.25
+            },
+            {
+                "id": "h5",
+                "type": "NEURON",
+                "label": "Knee Output",
+                "activation": 0,
+                "x": 0.65,
+                "y": 0.45
+            },
+            {
+                "id": "h6",
+                "type": "NEURON",
+                "label": "Arm Output",
+                "activation": 0,
+                "x": 0.65,
+                "y": 0.65
+            },
+            {
+                "id": "h7",
+                "type": "NEURON",
+                "label": "Hand Output",
+                "activation": 0,
+                "x": 0.65,
+                "y": 0.85
+            },
+            {
+                "id": "a1",
+                "type": "ACTUATOR",
+                "label": "Joint 1",
+                "activation": 0,
+                "x": 0.9,
+                "y": 0.08
+            },
+            {
+                "id": "a2",
+                "type": "ACTUATOR",
+                "label": "Joint 2",
+                "activation": 0,
+                "x": 0.9,
+                "y": 0.16
+            },
+            {
+                "id": "a3",
+                "type": "ACTUATOR",
+                "label": "Joint 3",
+                "activation": 0,
+                "x": 0.9,
+                "y": 0.24
+            },
+            {
+                "id": "a4",
+                "type": "ACTUATOR",
+                "label": "Joint 4",
+                "activation": 0,
+                "x": 0.9,
+                "y": 0.32
+            },
+            {
+                "id": "a5",
+                "type": "ACTUATOR",
+                "label": "Joint 5",
+                "activation": 0,
+                "x": 0.9,
+                "y": 0.4
+            },
+            {
+                "id": "a6",
+                "type": "ACTUATOR",
+                "label": "Joint 6",
+                "activation": 0,
+                "x": 0.9,
+                "y": 0.48
+            },
+            {
+                "id": "a7",
+                "type": "ACTUATOR",
+                "label": "Joint 7",
+                "activation": 0,
+                "x": 0.9,
+                "y": 0.56
+            },
+            {
+                "id": "a8",
+                "type": "ACTUATOR",
+                "label": "Joint 8",
+                "activation": 0,
+                "x": 0.9,
+                "y": 0.64
+            },
+            {
+                "id": "a9",
+                "type": "ACTUATOR",
+                "label": "Joint 9",
+                "activation": 0,
+                "x": 0.9,
+                "y": 0.72
+            },
+            {
+                "id": "a10",
+                "type": "ACTUATOR",
+                "label": "Joint 10",
+                "activation": 0,
+                "x": 0.9,
+                "y": 0.8
+            },
+            {
+                "id": "a11",
+                "type": "ACTUATOR",
+                "label": "Joint 11",
+                "activation": 0,
+                "x": 0.9,
+                "y": 0.88
+            },
+            {
+                "id": "a12",
+                "type": "ACTUATOR",
+                "label": "Joint 12",
+                "activation": 0,
+                "x": 0.9,
+                "y": 0.96
+            },
+            {
+                "id": "a13",
+                "type": "ACTUATOR",
+                "label": "Joint 13",
+                "activation": 0,
+                "x": 0.9,
+                "y": 1
+            }
+        ],
+        "connections": [
+            { "source": "o1", "target": "h1", "weight": 0.85 },
+            { "source": "o1", "target": "h2", "weight": -0.55 },
+            { "source": "o1", "target": "h3", "weight": 0.72 },
+            { "source": "s1", "target": "h0", "weight": 0.68 },
+            { "source": "s2", "target": "h1", "weight": 0.42 },
+            { "source": "s2", "target": "h2", "weight": -0.33 },
+            { "source": "s3", "target": "h3", "weight": 0.59 },
+            { "source": "h0", "target": "h4", "weight": 0.76 },
+            { "source": "h1", "target": "h4", "weight": 0.41 },
+            { "source": "h1", "target": "h5", "weight": -0.62 },
+            { "source": "h2", "target": "h6", "weight": 0.74 },
+            { "source": "h3", "target": "h5", "weight": 0.57 },
+            { "source": "h3", "target": "h7", "weight": -0.45 },
+            { "source": "h4", "target": "a2", "weight": 1.1 },
+            { "source": "h4", "target": "a5", "weight": -1.05 },
+            { "source": "h4", "target": "a8", "weight": 1.08 },
+            { "source": "h4", "target": "a11", "weight": -1.12 },
+            { "source": "h5", "target": "a3", "weight": 0.92 },
+            { "source": "h5", "target": "a4", "weight": -0.81 },
+            { "source": "h5", "target": "a6", "weight": 0.83 },
+            { "source": "h5", "target": "a7", "weight": -0.77 },
+            { "source": "h6", "target": "a9", "weight": 0.88 },
+            { "source": "h6", "target": "a12", "weight": -0.9 },
+            { "source": "h6", "target": "a10", "weight": 0.84 },
+            { "source": "h6", "target": "a13", "weight": -0.86 },
+            { "source": "h7", "target": "a1", "weight": 0.55 },
+            { "source": "h7", "target": "a4", "weight": 0.6 },
+            { "source": "h7", "target": "a7", "weight": -0.64 },
+            { "source": "h7", "target": "a10", "weight": 0.58 },
+            { "source": "s1", "target": "h7", "weight": -0.32 },
+            { "source": "s3", "target": "h6", "weight": 0.48 },
+            { "source": "h0", "target": "h5", "weight": 0.66 }
+        ]
+    }
+}

@@ -4,6 +4,7 @@ import quadruped from '../presets/quadruped.json';
 import biped from '../presets/biped.json';
 import star from '../presets/star.json';
 import crawler from '../presets/crawler.json';
+import human from '../presets/human.json';
 
 const BASIC_SENSORS = [
     { id: 's1', type: NodeType.SENSOR, label: 'Gnd Contact', activation: 0, x: 0.1, y: 0.2 },
@@ -17,5 +18,6 @@ export const PRESETS: { name: string; genome: Genome }[] = [
     { name: 'Quadruped', genome: quadruped as Genome },
     { name: 'Biped', genome: biped as Genome },
     { name: 'Star', genome: star as Genome },
-    { name: 'Crawler', genome: crawler as Genome }
+    { name: 'Crawler', genome: crawler as Genome },
+    { name: 'Human', genome: human as Genome }
 ];
