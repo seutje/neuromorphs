@@ -1,9 +1,10 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { useResizeObserver } from '../hooks/useResizeObserver';
 import { Genome, NeuralConnection, NeuralNode, BlockNode, NodeType } from '../types';
+import { resolveNodePositions } from '../services/brainLayout';
 
 interface BrainVisualizerProps {
   genome: Genome;
@@ -13,6 +14,7 @@ interface BrainVisualizerProps {
 export const BrainVisualizer: React.FC<BrainVisualizerProps> = ({ genome, active }) => {
   const { nodes, connections } = genome.brain;
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const layoutPositions = useMemo(() => resolveNodePositions(nodes, 0.1, 0.06), [nodes]);
 
   const drawRef = useRef<(time: number) => void>(() => { });
 
@@ -33,10 +35,13 @@ export const BrainVisualizer: React.FC<BrainVisualizerProps> = ({ genome, active
         const target = nodes.find(n => n.id === conn.target);
         if (!source || !target) return;
 
-        const sx = source.x * canvas.width;
-        const sy = source.y * canvas.height;
-        const tx = target.x * canvas.width;
-        const ty = target.y * canvas.height;
+        const sourcePos = layoutPositions.get(source.id) ?? { x: source.x, y: source.y };
+        const targetPos = layoutPositions.get(target.id) ?? { x: target.x, y: target.y };
+
+        const sx = sourcePos.x * canvas.width;
+        const sy = sourcePos.y * canvas.height;
+        const tx = targetPos.x * canvas.width;
+        const ty = targetPos.y * canvas.height;
 
         // Pulse effect if active
         // Pulse effect if active
@@ -58,8 +63,9 @@ export const BrainVisualizer: React.FC<BrainVisualizerProps> = ({ genome, active
 
       // Draw Nodes
       nodes.forEach(node => {
-        const x = node.x * canvas.width;
-        const y = node.y * canvas.height;
+        const position = layoutPositions.get(node.id) ?? { x: node.x, y: node.y };
+        const x = position.x * canvas.width;
+        const y = position.y * canvas.height;
 
         ctx.beginPath();
         ctx.arc(x, y, 6, 0, Math.PI * 2);
@@ -101,7 +107,7 @@ export const BrainVisualizer: React.FC<BrainVisualizerProps> = ({ genome, active
     animate(0);
 
     return () => cancelAnimationFrame(animationFrameId);
-  }, [genome, active]);
+  }, [genome, active, layoutPositions]);
 
   useResizeObserver(canvasRef, (width, height) => {
     const canvas = canvasRef.current;

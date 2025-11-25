@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Genome, NeuralNode, NodeType } from '../types';
 import { useResizeObserver } from '../hooks/useResizeObserver';
+import { resolveNodePositions } from '../services/brainLayout';
 
 interface BrainEditorCanvasProps {
     genome: Genome;
@@ -13,6 +14,7 @@ export const BrainEditorCanvas: React.FC<BrainEditorCanvasProps> = ({ genome, se
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+    const layoutPositions = useMemo(() => resolveNodePositions(nodes, 0.12, 0.08), [nodes]);
 
     // Helper to get mouse pos relative to canvas
     const getMousePos = (e: React.MouseEvent) => {
@@ -58,10 +60,13 @@ export const BrainEditorCanvas: React.FC<BrainEditorCanvasProps> = ({ genome, se
             const target = nodes.find(n => n.id === conn.target);
             if (!source || !target) return;
 
-            const sx = source.x * canvas.width;
-            const sy = source.y * canvas.height;
-            const tx = target.x * canvas.width;
-            const ty = target.y * canvas.height;
+            const sourcePos = layoutPositions.get(source.id) ?? { x: source.x, y: source.y };
+            const targetPos = layoutPositions.get(target.id) ?? { x: target.x, y: target.y };
+
+            const sx = sourcePos.x * canvas.width;
+            const sy = sourcePos.y * canvas.height;
+            const tx = targetPos.x * canvas.width;
+            const ty = targetPos.y * canvas.height;
 
             ctx.beginPath();
             ctx.moveTo(sx, sy);
@@ -88,8 +93,9 @@ export const BrainEditorCanvas: React.FC<BrainEditorCanvasProps> = ({ genome, se
 
         // Draw Nodes
         nodes.forEach(node => {
-            const x = node.x * canvas.width;
-            const y = node.y * canvas.height;
+            const position = layoutPositions.get(node.id) ?? { x: node.x, y: node.y };
+            const x = position.x * canvas.width;
+            const y = position.y * canvas.height;
             const isSelected = node.id === selectedNodeId;
             const isHovered = node.id === hoveredNodeId;
 
@@ -120,7 +126,7 @@ export const BrainEditorCanvas: React.FC<BrainEditorCanvasProps> = ({ genome, se
             ctx.textAlign = 'center';
             ctx.fillText(node.label || node.id, x, y + 24);
         });
-    }, [nodes, connections, selectedNodeId, hoveredNodeId]);
+    }, [nodes, connections, selectedNodeId, hoveredNodeId, layoutPositions]);
 
     // Keep a ref to the latest draw function so we can call it from resize observer
     const drawRef = useRef(draw);
@@ -150,8 +156,9 @@ export const BrainEditorCanvas: React.FC<BrainEditorCanvasProps> = ({ genome, se
 
         let found: string | null = null;
         for (const node of nodes) {
-            const nx = node.x * canvas.width;
-            const ny = node.y * canvas.height;
+            const position = layoutPositions.get(node.id) ?? { x: node.x, y: node.y };
+            const nx = position.x * canvas.width;
+            const ny = position.y * canvas.height;
             const dist = Math.sqrt(Math.pow(pixelX - nx, 2) + Math.pow(pixelY - ny, 2));
             if (dist < 15) { // Hit radius
                 found = node.id;

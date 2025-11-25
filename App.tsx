@@ -12,6 +12,7 @@ import { BrainEditorCanvas } from './components/BrainEditorCanvas';
 import { BrainPropertiesPanel } from './components/BrainPropertiesPanel';
 import { HistoryPanel } from './components/HistoryPanel';
 import { BlockNode, JointType, Genome, NodeType, NeuralNode, NeuralConnection } from './types';
+import { findOpenPosition } from './services/brainLayout';
 
 // Initial Config
 const INITIAL_CONFIG: SimulationConfig = {
@@ -404,13 +405,14 @@ function App() {
   // Brain Editor Handlers
   const handleAddBrainNode = (type: NodeType, label: string) => {
     if (!editedGenome) return;
+    const { x, y } = findOpenPosition(editedGenome.brain.nodes);
     const newNode: NeuralNode = {
       id: `node_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       type,
       label,
       activation: 0,
-      x: 0.5 + (Math.random() - 0.5) * 0.2,
-      y: 0.5 + (Math.random() - 0.5) * 0.2
+      x,
+      y
     };
 
     const newBrain = {
