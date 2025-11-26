@@ -99,7 +99,7 @@
             "jointParams": {
                 "speed": 5.1,
                 "phase": 5.6,
-                "amp": 1.0
+                "amp": 1
             },
             "attachFace": 3,
             "parentOffset": [
@@ -189,7 +189,7 @@
             "jointParams": {
                 "speed": 5.1,
                 "phase": 2.9,
-                "amp": 1.0
+                "amp": 1
             },
             "attachFace": 3,
             "parentOffset": [
@@ -234,8 +234,8 @@
         {
             "id": 8,
             "size": [
-                0.22,
                 0.55,
+                0.22,
                 0.22
             ],
             "color": "#ef4444",
@@ -253,8 +253,8 @@
             },
             "attachFace": 0,
             "parentOffset": [
-                0,
-                0.25
+                0.45,
+                0
             ],
             "childOffset": [
                 0,
@@ -264,8 +264,8 @@
         {
             "id": 9,
             "size": [
-                0.18,
                 0.45,
+                0.18,
                 0.18
             ],
             "color": "#dc2626",
@@ -294,9 +294,9 @@
         {
             "id": 10,
             "size": [
+                0.3,
                 0.18,
-                0.18,
-                0.3
+                0.18
             ],
             "color": "#b91c1c",
             "parentId": 9,
@@ -307,25 +307,25 @@
             ],
             "jointType": "REVOLUTE",
             "jointParams": {
-                "speed": 6.0,
+                "speed": 6,
                 "phase": 2.25,
                 "amp": 0.7
             },
             "attachFace": 0,
             "parentOffset": [
                 0,
-                -0.05
+                0.01
             ],
             "childOffset": [
                 0,
-                0.08
+                0.01
             ]
         },
         {
             "id": 11,
             "size": [
-                0.22,
                 0.55,
+                0.22,
                 0.22
             ],
             "color": "#ef4444",
@@ -343,8 +343,8 @@
             },
             "attachFace": 1,
             "parentOffset": [
-                0,
-                0.25
+                0.45,
+                0
             ],
             "childOffset": [
                 0,
@@ -354,8 +354,8 @@
         {
             "id": 12,
             "size": [
-                0.18,
                 0.45,
+                0.18,
                 0.18
             ],
             "color": "#dc2626",
@@ -384,9 +384,9 @@
         {
             "id": 13,
             "size": [
+                0.3,
                 0.18,
-                0.18,
-                0.3
+                0.18
             ],
             "color": "#b91c1c",
             "parentId": 12,
@@ -397,18 +397,18 @@
             ],
             "jointType": "REVOLUTE",
             "jointParams": {
-                "speed": 6.0,
+                "speed": 6,
                 "phase": 4.35,
                 "amp": 0.7
             },
             "attachFace": 1,
             "parentOffset": [
                 0,
-                -0.05
+                0.01
             ],
             "childOffset": [
                 0,
-                0.08
+                0.01
             ]
         }
     ],
@@ -616,38 +616,166 @@
             }
         ],
         "connections": [
-            { "source": "o1", "target": "h1", "weight": 0.85 },
-            { "source": "o1", "target": "h2", "weight": -0.55 },
-            { "source": "o1", "target": "h3", "weight": 0.72 },
-            { "source": "s1", "target": "h0", "weight": 0.68 },
-            { "source": "s2", "target": "h1", "weight": 0.42 },
-            { "source": "s2", "target": "h2", "weight": -0.33 },
-            { "source": "s3", "target": "h3", "weight": 0.59 },
-            { "source": "h0", "target": "h4", "weight": 0.76 },
-            { "source": "h1", "target": "h4", "weight": 0.41 },
-            { "source": "h1", "target": "h5", "weight": -0.62 },
-            { "source": "h2", "target": "h6", "weight": 0.74 },
-            { "source": "h3", "target": "h5", "weight": 0.57 },
-            { "source": "h3", "target": "h7", "weight": -0.45 },
-            { "source": "h4", "target": "a2", "weight": 1.1 },
-            { "source": "h4", "target": "a5", "weight": -1.05 },
-            { "source": "h4", "target": "a8", "weight": 1.08 },
-            { "source": "h4", "target": "a11", "weight": -1.12 },
-            { "source": "h5", "target": "a3", "weight": 0.92 },
-            { "source": "h5", "target": "a4", "weight": -0.81 },
-            { "source": "h5", "target": "a6", "weight": 0.83 },
-            { "source": "h5", "target": "a7", "weight": -0.77 },
-            { "source": "h6", "target": "a9", "weight": 0.88 },
-            { "source": "h6", "target": "a12", "weight": -0.9 },
-            { "source": "h6", "target": "a10", "weight": 0.84 },
-            { "source": "h6", "target": "a13", "weight": -0.86 },
-            { "source": "h7", "target": "a1", "weight": 0.55 },
-            { "source": "h7", "target": "a4", "weight": 0.6 },
-            { "source": "h7", "target": "a7", "weight": -0.64 },
-            { "source": "h7", "target": "a10", "weight": 0.58 },
-            { "source": "s1", "target": "h7", "weight": -0.32 },
-            { "source": "s3", "target": "h6", "weight": 0.48 },
-            { "source": "h0", "target": "h5", "weight": 0.66 }
+            {
+                "source": "o1",
+                "target": "h1",
+                "weight": 0.85
+            },
+            {
+                "source": "o1",
+                "target": "h2",
+                "weight": -0.55
+            },
+            {
+                "source": "o1",
+                "target": "h3",
+                "weight": 0.72
+            },
+            {
+                "source": "s1",
+                "target": "h0",
+                "weight": 0.68
+            },
+            {
+                "source": "s2",
+                "target": "h1",
+                "weight": 0.42
+            },
+            {
+                "source": "s2",
+                "target": "h2",
+                "weight": -0.33
+            },
+            {
+                "source": "s3",
+                "target": "h3",
+                "weight": 0.59
+            },
+            {
+                "source": "h0",
+                "target": "h4",
+                "weight": 0.76
+            },
+            {
+                "source": "h1",
+                "target": "h4",
+                "weight": 0.41
+            },
+            {
+                "source": "h1",
+                "target": "h5",
+                "weight": -0.62
+            },
+            {
+                "source": "h2",
+                "target": "h6",
+                "weight": 0.74
+            },
+            {
+                "source": "h3",
+                "target": "h5",
+                "weight": 0.57
+            },
+            {
+                "source": "h3",
+                "target": "h7",
+                "weight": -0.45
+            },
+            {
+                "source": "h4",
+                "target": "a2",
+                "weight": 1.1
+            },
+            {
+                "source": "h4",
+                "target": "a5",
+                "weight": -1.05
+            },
+            {
+                "source": "h4",
+                "target": "a8",
+                "weight": 1.08
+            },
+            {
+                "source": "h4",
+                "target": "a11",
+                "weight": -1.12
+            },
+            {
+                "source": "h5",
+                "target": "a3",
+                "weight": 0.92
+            },
+            {
+                "source": "h5",
+                "target": "a4",
+                "weight": -0.81
+            },
+            {
+                "source": "h5",
+                "target": "a6",
+                "weight": 0.83
+            },
+            {
+                "source": "h5",
+                "target": "a7",
+                "weight": -0.77
+            },
+            {
+                "source": "h6",
+                "target": "a9",
+                "weight": 0.88
+            },
+            {
+                "source": "h6",
+                "target": "a12",
+                "weight": -0.9
+            },
+            {
+                "source": "h6",
+                "target": "a10",
+                "weight": 0.84
+            },
+            {
+                "source": "h6",
+                "target": "a13",
+                "weight": -0.86
+            },
+            {
+                "source": "h7",
+                "target": "a1",
+                "weight": 0.55
+            },
+            {
+                "source": "h7",
+                "target": "a4",
+                "weight": 0.6
+            },
+            {
+                "source": "h7",
+                "target": "a7",
+                "weight": -0.64
+            },
+            {
+                "source": "h7",
+                "target": "a10",
+                "weight": 0.58
+            },
+            {
+                "source": "s1",
+                "target": "h7",
+                "weight": -0.32
+            },
+            {
+                "source": "s3",
+                "target": "h6",
+                "weight": 0.48
+            },
+            {
+                "source": "h0",
+                "target": "h5",
+                "weight": 0.66
+            }
         ]
     }
 }
