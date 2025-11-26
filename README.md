@@ -1,6 +1,14 @@
+![NeuroMorphs infographic](infographic.png)
+
 # NeuroMorphs
 
 **NeuroMorphs** is a browser-based evolution simulation inspired by Karl Sims' "Evolved Virtual Creatures". It uses a genetic algorithm to evolve 3D block-based creatures that learn to walk, run, or crawl within a physics simulation.
+
+## 🌟 Highlights
+
+- **Full-stack evolution playground**: Run the evolutionary loop in real time with Rapier3D physics, Three.js rendering, and customizable simulation seeds, population size, epoch length, and environments (Earth, Moon, Jupiter, Water).【F:components/SettingsPane.tsx†L38-L118】
+- **Hands-on editors**: Switch between simulation and editor modes to design bodies and brains, add or remove blocks, tweak joint parameters, and automatically wire actuators into the neural graph before sending creatures back into the arena.【F:components/EditorView.tsx†L12-L91】
+- **Visual feedback**: Inspect morphology, brain connectivity, and fitness history through dedicated visualizers and the Recharts-powered stats panel to see how each generation improves.【F:components/StatsPanel.tsx†L9-L59】【F:components/Visualizers.tsx†L1-L200】
 
 ## 🚀 Getting Started
 
